@@ -1,5 +1,5 @@
 {
-  "version": "1.2.1",
+  "version": "1.3.0",
   "date": "2026-11-18",
-  "notes": "Homescreen-Name auf 'Board' gesetzt"
+  "notes": "Filter per Haken, Favoriten/Suchfeld/Homebutton-Hinweis entfernt, Auto-Update-Banner beim Laden"
 }

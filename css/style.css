@@ -270,19 +270,39 @@ html[data-theme="light"] kbd {
 }
 
 .update-banner {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   width: calc(100% - 32px);
   max-width: 1332px;
   margin: 12px auto 0;
-  padding: 10px 16px;
-  border-radius: 12px;
-  border: 1px solid rgba(245, 184, 46, 0.5);
-  background: linear-gradient(135deg, rgba(245, 184, 46, 0.2), rgba(255, 42, 92, 0.2));
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(245, 184, 46, 0.65);
+  background: linear-gradient(135deg, rgba(245, 184, 46, 0.24), rgba(255, 42, 92, 0.24));
+  box-shadow: 0 8px 26px rgba(245, 184, 46, 0.18);
   color: var(--text-primary);
-  font-size: 0.84rem;
+  font-size: 0.88rem;
   font-weight: 600;
   text-align: center;
   cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.update-banner:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 30px rgba(245, 184, 46, 0.28);
+}
+
+.update-banner-pulse {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent-gold);
+  box-shadow: 0 0 10px var(--accent-gold);
+  animation: pulseDot 0.9s infinite alternate;
+  flex-shrink: 0;
 }
 
 .update-banner[hidden] {
@@ -655,53 +675,89 @@ html[data-theme="light"] .icon-sun { display: none; }
   border-color: rgba(245, 184, 46, 0.5);
 }
 
-/* Filter Bar & Category Tabs */
+/* Filter Bar with Checkboxes (Haken) */
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: 12px 18px;
 }
 
-.category-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.filter-bar-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.cat-tab {
+.checkbox-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1;
+}
+
+.check-filter-chip {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 7px 13px;
-  border-radius: 999px;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 12px;
   border: 1px solid var(--border-subtle);
   background: var(--bg-input);
   color: var(--text-secondary);
-  font-size: 0.81rem;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
+  user-select: none;
+  opacity: 0.55;
   transition: all 0.18s ease;
 }
 
-.cat-tab:hover {
-  color: var(--text-primary);
+.check-filter-chip:hover {
   border-color: var(--border-highlight);
+  color: var(--text-primary);
 }
 
-.cat-tab.active {
-  background: var(--text-primary);
-  color: var(--bg-base);
-  border-color: transparent;
+.check-filter-chip.checked {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-highlight);
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .check-filter-chip.checked {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.check-box {
+  width: 17px;
+  height: 17px;
+  border-radius: 5px;
+  border: 1.5px solid var(--text-muted);
+  display: inline-grid;
+  place-items: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: transparent;
+  background: transparent;
+  transition: all 0.16s ease;
+}
+
+.check-filter-chip.checked .check-box {
+  background: var(--accent-emerald);
+  border-color: var(--accent-emerald);
+  color: #080a0f;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.35);
 }
 
 .cat-count {
   font-family: var(--font-mono);
   font-size: 0.7rem;
   opacity: 0.75;
-  padding: 1px 5px;
+  padding: 1px 6px;
   border-radius: 999px;
   background: rgba(128, 128, 128, 0.2);
 }
@@ -714,95 +770,6 @@ html[data-theme="light"] .icon-sun { display: none; }
 .rd-dot { background: #ff2a5c; box-shadow: 0 0 6px #ff2a5c; }
 .perf-dot { background: #ff6b2b; box-shadow: 0 0 6px #ff6b2b; }
 .life-dot { background: #eab308; box-shadow: 0 0 6px #eab308; }
-
-.filter-right-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  flex: 1;
-  justify-content: flex-end;
-}
-
-.reorder-toggle-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 13px;
-  border-radius: 999px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-input);
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.18s ease;
-}
-
-.reorder-toggle-btn svg {
-  width: 14px;
-  height: 14px;
-}
-
-.reorder-toggle-btn:hover {
-  color: var(--text-primary);
-  border-color: var(--border-highlight);
-}
-
-.reorder-toggle-btn.active {
-  background: var(--accent-gold);
-  color: #0b0d13;
-  border-color: transparent;
-  box-shadow: 0 0 16px rgba(245, 184, 46, 0.35);
-}
-
-.inline-search-wrap {
-  position: relative;
-  min-width: 180px;
-  flex: 1;
-  max-width: 240px;
-}
-
-.inline-search-icon {
-  position: absolute;
-  left: 11px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 15px;
-  height: 15px;
-  color: var(--text-muted);
-  pointer-events: none;
-}
-
-.inline-search-input {
-  width: 100%;
-  padding: 7px 28px 7px 32px;
-  border-radius: 999px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-input);
-  color: var(--text-primary);
-  font-size: 0.82rem;
-  outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.inline-search-input:focus {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(255, 42, 92, 0.15);
-}
-
-.inline-search-clear {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 0.75rem;
-  padding: 2px 4px;
-}
 
 /* ==========================================================================
    Bento App Grid & Interactive App Cards
@@ -1017,27 +984,22 @@ html[data-theme="light"] .icon-sun { display: none; }
 
 /* Reorder Controls & Drag States */
 .move-controls {
-  display: none;
-  align-items: center;
-  gap: 4px;
-}
-
-body.reorder-active .move-controls,
-.app-card:hover .move-controls {
   display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .move-btn {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 7px;
-  border: 1px solid var(--border-highlight);
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
   display: grid;
   place-items: center;
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
   transition: all 0.16s ease;
 }
@@ -1049,7 +1011,7 @@ body.reorder-active .move-controls,
 }
 
 .move-btn:disabled {
-  opacity: 0.28;
+  opacity: 0.22;
   cursor: default;
 }
 
@@ -1068,49 +1030,6 @@ body.reorder-active .move-controls,
   transform: translateY(-6px) scale(1.12);
   outline: 2px solid var(--accent-gold);
   outline-offset: 2px;
-}
-
-body.reorder-active .app-card {
-  border-style: dashed;
-  border-color: rgba(245, 184, 46, 0.45);
-}
-
-.dock-move-arrows {
-  display: none;
-  position: absolute;
-  top: -22px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-glass-strong);
-  border: 1px solid var(--border-highlight);
-  border-radius: 999px;
-  padding: 1px 4px;
-  gap: 2px;
-  z-index: 10;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
-}
-
-body.reorder-active .dock-move-arrows {
-  display: inline-flex;
-}
-
-.dock-arrow-btn {
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 0.65rem;
-  font-weight: 800;
-  padding: 2px 4px;
-  cursor: pointer;
-  line-height: 1;
-}
-
-.dock-arrow-btn:hover:not(:disabled) {
-  color: var(--accent-gold);
-}
-
-.dock-arrow-btn:disabled {
-  opacity: 0.25;
 }
 
 /* Card Description & Interactive Feature Area */

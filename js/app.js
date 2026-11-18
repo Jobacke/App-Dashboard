@@ -1,8 +1,8 @@
 /* ==========================================================================
-   Command Hub · App-Dashboard — Application Logic & Interactive Features
+   Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.3.0';
 const APP_BUILD_DATE = '18.11.2026';
 
 const APPS = [
@@ -158,6 +158,7 @@ const APPS = [
 ];
 
 const DEFAULT_ORDER = APPS.map((a) => a.id);
+const ALL_CATEGORIES = ['rettungsdienst', 'performance', 'alltag'];
 
 function loadAppOrder() {
   try {
@@ -171,15 +172,23 @@ function loadAppOrder() {
   return [...DEFAULT_ORDER];
 }
 
+function loadCheckedCategories() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('dashboard_checked_cats') || 'null');
+    if (Array.isArray(saved)) {
+      const valid = saved.filter((c) => ALL_CATEGORIES.includes(c));
+      if (valid.length > 0) return valid;
+    }
+  } catch (e) {}
+  return [...ALL_CATEGORIES];
+}
+
 /* State Management */
 const state = {
-  category: 'all',
-  searchQuery: '',
+  checkedCategories: loadCheckedCategories(),
   launchMode: localStorage.getItem('dashboard_launch_mode') || 'tab',
   appOrder: loadAppOrder(),
-  reorderMode: false,
   draggedAppId: null,
-  pinned: JSON.parse(localStorage.getItem('dashboard_pinned') || '[]'),
   usageCounts: JSON.parse(localStorage.getItem('dashboard_usage') || '{}'),
   lastOpened: JSON.parse(localStorage.getItem('dashboard_last_opened') || 'null'),
   activeCockpitAppId: null,
@@ -238,12 +247,10 @@ document.addEventListener('DOMContentLoaded', () => {
   initLaunchModeControl();
   initThemeToggle();
   initScratchpad();
-  initFiltersAndSearch();
-  initReorderModeToggle();
+  initCheckboxFilters();
   initWorkflows();
   initCockpitControls();
   initCommandPalette();
-  initIosInstallModal();
   initGlobalShortcuts();
   initLivePingButton();
   initVersionDisplayAndUpdateCheck();
@@ -312,29 +319,18 @@ function updateLastOpenedDisplay() {
 }
 
 /* ==========================================================================
-   Rendering: Bento Grid, Floating Dock & Pinned Count
+   Rendering: Bento Grid & Floating Dock
    (Strictly synchronized order between Board and Dock!)
    ========================================================================== */
 function renderAll() {
   renderAppsGrid();
   renderDock();
-  updatePinnedBadge();
+  syncCheckboxFilterUI();
 }
 
 function getFilteredApps() {
-  const q = state.searchQuery.trim().toLowerCase();
   const ordered = getOrderedApps();
-  return ordered.filter((app) => {
-    if (state.category === 'pinned' && !state.pinned.includes(app.id)) {
-      return false;
-    }
-    if (state.category !== 'all' && state.category !== 'pinned' && app.category !== state.category) {
-      return false;
-    }
-    if (!q) return true;
-    const haystack = `${app.title} ${app.domain} ${app.categoryLabel} ${app.description} ${app.keywords}`.toLowerCase();
-    return haystack.includes(q);
-  });
+  return ordered.filter((app) => state.checkedCategories.includes(app.category));
 }
 
 function renderAppsGrid() {
@@ -346,28 +342,25 @@ function renderAppsGrid() {
   if (filtered.length === 0) {
     grid.innerHTML = `
       <div class="glass-panel" style="grid-column: span 12; padding: 36px; text-align: center;">
-        <p style="font-size: 1.05rem; font-weight: 600; margin-bottom: 6px;">Keine passende App gefunden</p>
+        <p style="font-size: 1.05rem; font-weight: 600; margin-bottom: 6px;">Alle Kategorien sind ausgeblendet</p>
         <p style="color: var(--text-secondary); font-size: 0.86rem; margin-bottom: 14px;">
-          Für „${escapeHtml(state.searchQuery)}“ in dieser Kategorie gibt es keinen direkten Treffer.
+          Setze oben wieder mindestens einen Haken, um die Apps einzublenden.
         </p>
-        <button type="button" class="launch-cta" id="reset-filter-btn" style="cursor:pointer;">Alle 7 Apps anzeigen</button>
+        <button type="button" class="launch-cta" id="reset-filter-btn" style="cursor:pointer;">Alle Haken aktivieren</button>
       </div>
     `;
     document.getElementById('reset-filter-btn')?.addEventListener('click', () => {
-      state.category = 'all';
-      state.searchQuery = '';
-      const searchInput = document.getElementById('inline-search');
-      if (searchInput) searchInput.value = '';
-      syncCategoryTabs();
+      state.checkedCategories = [...ALL_CATEGORIES];
+      localStorage.setItem('dashboard_checked_cats', JSON.stringify(state.checkedCategories));
       renderAll();
     });
     return;
   }
 
-  /* Keep exact user-chosen order (`state.appOrder`) so Board & Dock are 100% identical */
+  const allSelected = state.checkedCategories.length === ALL_CATEGORIES.length;
+
   grid.innerHTML = filtered.map((app) => {
-    const isPinned = state.pinned.includes(app.id);
-    const wideClass = (app.bentoWide && state.category === 'all' && !state.searchQuery) ? 'bento-wide' : '';
+    const wideClass = (app.bentoWide && allSelected) ? 'bento-wide' : '';
     const opensCount = state.usageCounts[app.id] || 0;
     const orderIdx = state.appOrder.indexOf(app.id);
     const isFirst = orderIdx === 0;
@@ -395,33 +388,23 @@ function renderAppsGrid() {
           </div>
 
           <div class="card-meta-actions">
-            <div class="move-controls" role="group" aria-label="Position ändern">
+            <div class="move-controls" role="group" aria-label="Position verschieben">
               <button type="button"
                       class="move-btn"
                       data-action="move-prev"
                       data-app-id="${app.id}"
                       ${isFirst ? 'disabled' : ''}
-                      title="Nach vorne / links verschieben"
-                      aria-label="Nach links verschieben">←</button>
+                      title="Nach vorne verschieben"
+                      aria-label="Nach vorne verschieben">◀</button>
               <button type="button"
                       class="move-btn"
                       data-action="move-next"
                       data-app-id="${app.id}"
                       ${isLast ? 'disabled' : ''}
-                      title="Nach hinten / rechts verschieben"
-                      aria-label="Nach rechts verschieben">→</button>
+                      title="Nach hinten verschieben"
+                      aria-label="Nach hinten verschieben">▶</button>
             </div>
             <span class="shortcut-badge" title="Tastatur-Direktwahl: Taste ${app.key}">${app.key}</span>
-            <button type="button"
-                    class="card-action-btn ${isPinned ? 'pinned' : ''}"
-                    data-action="pin"
-                    data-app-id="${app.id}"
-                    title="${isPinned ? 'Aus Favoriten lösen' : 'Als Favorit anheften'}"
-                    aria-label="Favorit umschalten">
-              <svg viewBox="0 0 24 24" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-              </svg>
-            </button>
             <button type="button"
                     class="card-action-btn"
                     data-action="cockpit"
@@ -525,11 +508,11 @@ function attachCardListeners() {
       const sourceId = state.draggedAppId || e.dataTransfer?.getData('text/plain');
       if (sourceId && sourceId !== appId) {
         reorderAppBefore(sourceId, appId);
-        showToast('Reihenfolge im Board & Dock aktualisiert');
+        showToast('Reihenfolge im Board & Dock synchronisiert');
       }
     });
 
-    /* Card click launches app (unless in reorder mode or clicking controls) */
+    /* Card click launches app */
     card.addEventListener('click', (e) => {
       if (
         e.target.closest('[data-action]') ||
@@ -539,12 +522,11 @@ function attachCardListeners() {
       ) {
         return;
       }
-      if (state.reorderMode) return;
       triggerAppLaunch(appId);
     });
   });
 
-  /* Move Left / Right buttons */
+  /* Move Left / Right buttons on each card */
   document.querySelectorAll('[data-action="move-prev"]').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -579,14 +561,7 @@ function attachCardListeners() {
     });
   });
 
-  /* Pin & Cockpit Buttons */
-  document.querySelectorAll('[data-action="pin"]').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      togglePin(btn.dataset.appId);
-    });
-  });
-
+  /* Cockpit Button */
   document.querySelectorAll('[data-action="cockpit"]').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -616,40 +591,27 @@ function renderDock() {
 
   const ordered = getOrderedApps();
 
-  dock.innerHTML = ordered.map((app, idx) => {
-    const isFirst = idx === 0;
-    const isLast = idx === ordered.length - 1;
+  dock.innerHTML = ordered.map((app) => {
+    const isCategoryVisible = state.checkedCategories.includes(app.category);
     return `
       <div class="dock-item ${state.activeCockpitAppId === app.id ? 'active' : ''}"
+           style="${isCategoryVisible ? '' : 'opacity: 0.35;'}"
            draggable="true"
            role="button"
            tabindex="0"
            data-dock-app="${app.id}"
            data-title="${escapeHtml(app.title)} (${app.key})"
            aria-label="${escapeHtml(app.title)} öffnen">
-        <div class="dock-move-arrows">
-          <button type="button" class="dock-arrow-btn" data-dock-move="-1" data-app-id="${app.id}" ${isFirst ? 'disabled' : ''} aria-label="Links">◀</button>
-          <button type="button" class="dock-arrow-btn" data-dock-move="1" data-app-id="${app.id}" ${isLast ? 'disabled' : ''} aria-label="Rechts">▶</button>
-        </div>
         <img src="${app.icon}" alt="${escapeHtml(app.title)}" />
         <span class="dock-dot"></span>
       </div>
     `;
   }).join('');
 
-  dock.querySelectorAll('[data-dock-move]').forEach((arrowBtn) => {
-    arrowBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      moveAppInOrder(arrowBtn.dataset.appId, Number(arrowBtn.dataset.dockMove));
-    });
-  });
-
   dock.querySelectorAll('[data-dock-app]').forEach((item) => {
     const appId = item.dataset.dockApp;
 
-    item.addEventListener('click', (e) => {
-      if (e.target.closest('[data-dock-move]')) return;
-      if (state.reorderMode) return;
+    item.addEventListener('click', () => {
       triggerAppLaunch(appId);
     });
 
@@ -693,33 +655,38 @@ function renderDock() {
       const sourceId = state.draggedAppId || e.dataTransfer?.getData('text/plain');
       if (sourceId && sourceId !== appId) {
         reorderAppBefore(sourceId, appId);
-        showToast('Reihenfolge im Dock & Board aktualisiert');
+        showToast('Reihenfolge im Dock & Board synchronisiert');
       }
     });
   });
 }
 
-function initReorderModeToggle() {
-  const btn = document.getElementById('reorder-mode-btn');
-  btn?.addEventListener('click', () => {
-    state.reorderMode = !state.reorderMode;
-    document.body.classList.toggle('reorder-active', state.reorderMode);
-    btn.classList.toggle('active', state.reorderMode);
-    const span = btn.querySelector('span');
-    if (span) {
-      span.textContent = state.reorderMode ? 'Anordnung fertig' : 'Anordnung ändern';
-    }
-    showToast(
-      state.reorderMode
-        ? 'Verschiebe-Modus aktiv: Nutze ◀ ▶ oder Ziehen zum Sortieren'
-        : 'Neue Reihenfolge gespeichert ✓'
-    );
+/* ==========================================================================
+   Checkbox Category Filter (Haken setzen / abwählen)
+   ========================================================================== */
+function syncCheckboxFilterUI() {
+  document.querySelectorAll('[data-check-cat]').forEach((chip) => {
+    const cat = chip.dataset.checkCat;
+    const isChecked = state.checkedCategories.includes(cat);
+    chip.classList.toggle('checked', isChecked);
+    chip.setAttribute('aria-pressed', isChecked ? 'true' : 'false');
   });
 }
 
-function updatePinnedBadge() {
-  const countEl = document.getElementById('pinned-count');
-  if (countEl) countEl.textContent = String(state.pinned.length);
+function initCheckboxFilters() {
+  document.querySelectorAll('[data-check-cat]').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const cat = chip.dataset.checkCat;
+      const idx = state.checkedCategories.indexOf(cat);
+      if (idx >= 0) {
+        state.checkedCategories.splice(idx, 1);
+      } else {
+        state.checkedCategories.push(cat);
+      }
+      localStorage.setItem('dashboard_checked_cats', JSON.stringify(state.checkedCategories));
+      renderAll();
+    });
+  });
 }
 
 /* ==========================================================================
@@ -755,20 +722,6 @@ function recordAppUsage(app) {
   localStorage.setItem('dashboard_last_opened', JSON.stringify(state.lastOpened));
   updateLastOpenedDisplay();
   renderAppsGrid();
-}
-
-function togglePin(appId) {
-  const idx = state.pinned.indexOf(appId);
-  const app = APPS.find((a) => a.id === appId);
-  if (idx >= 0) {
-    state.pinned.splice(idx, 1);
-    showToast(`${app?.title || 'App'} aus Favoriten entfernt`);
-  } else {
-    state.pinned.push(appId);
-    showToast(`★ ${app?.title || 'App'} als Favorit angeheftet`);
-  }
-  localStorage.setItem('dashboard_pinned', JSON.stringify(state.pinned));
-  renderAll();
 }
 
 /* ==========================================================================
@@ -865,7 +818,7 @@ function initCockpitControls() {
 }
 
 /* ==========================================================================
-   Launch Mode, Theme, Scratchpad & Filters
+   Launch Mode, Theme & Scratchpad
    ========================================================================== */
 function initLaunchModeControl() {
   const buttons = document.querySelectorAll('[data-launch-mode]');
@@ -910,40 +863,6 @@ function initScratchpad() {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => status.classList.remove('visible'), 1800);
     }
-  });
-}
-
-function syncCategoryTabs() {
-  document.querySelectorAll('.cat-tab').forEach((tab) => {
-    const active = tab.dataset.category === state.category;
-    tab.classList.toggle('active', active);
-    tab.setAttribute('aria-selected', active ? 'true' : 'false');
-  });
-}
-
-function initFiltersAndSearch() {
-  document.querySelectorAll('.cat-tab').forEach((tab) => {
-    tab.addEventListener('click', () => {
-      state.category = tab.dataset.category;
-      syncCategoryTabs();
-      renderAppsGrid();
-    });
-  });
-
-  const searchInput = document.getElementById('inline-search');
-  const clearBtn = document.getElementById('inline-search-clear');
-
-  searchInput?.addEventListener('input', () => {
-    state.searchQuery = searchInput.value;
-    if (clearBtn) clearBtn.hidden = !state.searchQuery;
-    renderAppsGrid();
-  });
-
-  clearBtn?.addEventListener('click', () => {
-    state.searchQuery = '';
-    if (searchInput) searchInput.value = '';
-    clearBtn.hidden = true;
-    renderAppsGrid();
   });
 }
 
@@ -1100,7 +1019,7 @@ function renderCommandResults(query) {
     {
       type: 'theme',
       title: 'Erscheinungsbild umschalten (Dark / Light Mode)',
-      subtitle: 'Dashboard Design anpassen',
+      subtitle: 'Board Design anpassen',
       icon: 'icons/dashboard.svg',
       shortcut: 'T'
     }
@@ -1169,39 +1088,7 @@ function executeCommandItem(item, forceCockpit = false) {
 }
 
 /* ==========================================================================
-   iPhone Home-Screen Install Guide Modal
-   ========================================================================== */
-function initIosInstallModal() {
-  const btn = document.getElementById('ios-install-btn');
-  const modal = document.getElementById('ios-modal');
-  const closeBtn = document.getElementById('ios-modal-close');
-  const qrImg = document.getElementById('ios-qr-img');
-  const urlCode = document.getElementById('ios-live-url');
-
-  const liveUrl = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-    ? 'https://board.vjbackhaus.de/'
-    : location.href.split('#')[0];
-
-  if (urlCode) urlCode.textContent = liveUrl;
-  if (qrImg) {
-    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=6&data=${encodeURIComponent(liveUrl)}`;
-  }
-
-  btn?.addEventListener('click', () => {
-    if (modal) modal.hidden = false;
-  });
-
-  closeBtn?.addEventListener('click', () => {
-    if (modal) modal.hidden = true;
-  });
-
-  modal?.addEventListener('click', (e) => {
-    if (e.target === modal) modal.hidden = true;
-  });
-}
-
-/* ==========================================================================
-   Global Keyboard Shortcuts (Cmd+K, /, 1-7, Esc)
+   Global Keyboard Shortcuts (Cmd+K, 1-7, Esc)
    ========================================================================== */
 function initGlobalShortcuts() {
   document.addEventListener('keydown', (e) => {
@@ -1229,19 +1116,9 @@ function initGlobalShortcuts() {
         closeCockpit();
         return;
       }
-      if (state.reorderMode) {
-        document.getElementById('reorder-mode-btn')?.click();
-        return;
-      }
     }
 
     if (isTyping) return;
-
-    if (e.key === '/') {
-      e.preventDefault();
-      document.getElementById('inline-search')?.focus();
-      return;
-    }
 
     if (!e.metaKey && !e.ctrlKey && !e.altKey && /^[1-7]$/.test(e.key)) {
       e.preventDefault();
@@ -1255,7 +1132,7 @@ function initGlobalShortcuts() {
 }
 
 /* ==========================================================================
-   Utilities & PWA Service Worker
+   Utilities & PWA Service Worker + Automatic Version Update Detection
    ========================================================================== */
 function showToast(message) {
   const container = document.getElementById('toast-container');
@@ -1279,18 +1156,67 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-function registerServiceWorker() {
-  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
+let waitingServiceWorker = null;
+
+function showUpdateAvailableBanner(versionStr, notesStr = '') {
+  const updateBanner = document.getElementById('update-banner');
+  const updateText = document.getElementById('update-version-text');
+  const notesEl = document.getElementById('update-notes-text');
+
+  if (updateText) updateText.textContent = versionStr ? `v${versionStr.replace(/^v/, '')}` : '';
+  if (notesEl) notesEl.textContent = notesStr ? `(${notesStr})` : '';
+  if (updateBanner) updateBanner.hidden = false;
 }
 
-/* ==========================================================================
-   Version Display & Remote Version Check
-   ========================================================================== */
+async function applyUpdateAndReload() {
+  showToast('Lade neue Version…');
+  try {
+    if (waitingServiceWorker) {
+      waitingServiceWorker.postMessage('skipWaiting');
+    }
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.update().catch(() => {})));
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+  } catch (e) {}
+  window.location.reload();
+}
+
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return;
+
+  navigator.serviceWorker.register('sw.js').then((reg) => {
+    if (reg.waiting) {
+      waitingServiceWorker = reg.waiting;
+      showUpdateAvailableBanner('', 'Update bereit');
+    }
+    reg.addEventListener('updatefound', () => {
+      const installing = reg.installing;
+      if (!installing) return;
+      installing.addEventListener('statechange', () => {
+        if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+          waitingServiceWorker = installing;
+          showUpdateAvailableBanner('', 'Update bereit');
+        }
+      });
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        reg.update().catch(() => {});
+      }
+    });
+  }).catch(() => {});
+}
+
 function isVersionNewer(remoteVer, localVer) {
-  const r = String(remoteVer).split('.').map((n) => parseInt(n, 10) || 0);
-  const l = String(localVer).split('.').map((n) => parseInt(n, 10) || 0);
+  const r = String(remoteVer).replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
+  const l = String(localVer).replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
   for (let i = 0; i < Math.max(r.length, l.length); i++) {
     if ((r[i] || 0) > (l[i] || 0)) return true;
     if ((r[i] || 0) < (l[i] || 0)) return false;
@@ -1304,7 +1230,6 @@ function initVersionDisplayAndUpdateCheck() {
   const footerDate = document.getElementById('footer-date');
   const footerBtn = document.getElementById('footer-update-check');
   const updateBanner = document.getElementById('update-banner');
-  const updateText = document.getElementById('update-version-text');
 
   if (headerBadge) headerBadge.textContent = `v${APP_VERSION}`;
   if (footerVer) footerVer.textContent = `v${APP_VERSION}`;
@@ -1316,35 +1241,23 @@ function initVersionDisplayAndUpdateCheck() {
       if (!res.ok) return;
       const data = await res.json();
       if (data.version && isVersionNewer(data.version, APP_VERSION)) {
-        if (updateText) updateText.textContent = `v${data.version}`;
-        if (updateBanner) updateBanner.hidden = false;
+        showUpdateAvailableBanner(data.version, data.notes || '');
         if (manual) showToast(`Neue Version v${data.version} verfügbar!`);
       } else if (manual) {
-        showToast(`Version v${APP_VERSION} ist aktuell ✓`);
+        showToast(`Board v${APP_VERSION} ist auf dem neuesten Stand ✓`);
       }
     } catch (e) {
       if (manual) showToast(`Installierte Version: v${APP_VERSION}`);
     }
   }
 
-  async function forceReloadUpdate() {
-    showToast('Aktualisiere auf neueste Version…');
-    try {
-      if ('serviceWorker' in navigator) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map((r) => r.unregister()));
-      }
-      if ('caches' in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k)));
-      }
-    } catch (e) {}
-    location.reload();
-  }
-
   headerBadge?.addEventListener('click', () => checkRemoteVersion(true));
   footerBtn?.addEventListener('click', () => checkRemoteVersion(true));
-  updateBanner?.addEventListener('click', forceReloadUpdate);
+  updateBanner?.addEventListener('click', applyUpdateAndReload);
 
+  /* Automatically check on load and whenever the app returns to foreground */
   checkRemoteVersion(false);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) checkRemoteVersion(false);
+  });
 }

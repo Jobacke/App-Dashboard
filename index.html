@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Board" />
-  <link rel="manifest" href="manifest.webmanifest?v=8" />
+  <link rel="manifest" href="manifest.webmanifest?v=9" />
   <link rel="icon" type="image/svg+xml" href="icons/dashboard.svg" />
   <link rel="alternate icon" type="image/png" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2" />
@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=8" />
+  <link rel="stylesheet" href="css/style.css?v=9" />
   <script>
     try {
       const savedTheme = localStorage.getItem('dashboard_theme') || 'dark';
@@ -41,13 +41,13 @@
     <div class="top-bar-inner">
       <div class="brand">
         <div class="brand-logo-wrap">
-          <img src="icons/dashboard.svg" alt="Dashboard Logo" class="brand-logo" />
+          <img src="icons/dashboard.svg" alt="Board Logo" class="brand-logo" />
           <span class="brand-pulse"></span>
         </div>
         <div class="brand-text">
           <div class="brand-title-row">
-            <span class="brand-title">Command Hub</span>
-            <span class="version-badge" id="app-version-badge" title="Installierte Dashboard-Version (Tippen zum Prüfen auf Updates)">v1.2.1</span>
+            <span class="brand-title">Board</span>
+            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v1.3.0</span>
           </div>
           <span class="brand-subtitle">vjbackhaus.de Ecosystem</span>
         </div>
@@ -78,10 +78,6 @@
           </button>
         </div>
 
-        <button type="button" class="icon-btn" id="ios-install-btn" title="Auf iPhone Home-Bildschirm installieren" aria-label="iPhone Home-Bildschirm Anleitung">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-        </button>
-
         <button type="button" class="icon-btn" id="theme-toggle" title="Design wechseln (Dark / Light)" aria-label="Design wechseln">
           <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
           <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -90,14 +86,17 @@
     </div>
   </header>
 
-  <!-- Update Available Banner -->
+  <!-- Update Available Banner (prominent clickable bar when a new version is detected) -->
   <button type="button" id="update-banner" class="update-banner" hidden>
-    🔄 Neue Version <span id="update-version-text"></span> verfügbar – hier tippen zum Aktualisieren
+    <span class="update-banner-pulse"></span>
+    <span class="update-banner-text">
+      🔄 Neue Version <strong id="update-version-text"></strong> verfügbar <span id="update-notes-text"></span> – <u>hier klicken zum Laden</u>
+    </span>
   </button>
 
   <!-- Main Content Container -->
   <main class="dashboard-main" id="dashboard-main">
-    <!-- Top Section: Clock & Date (1st), Quick Memo (2nd), Filter Bar (3rd) -->
+    <!-- Top Section: Clock & Date (1st), Quick Memo (2nd), Checkbox Category Filter (3rd) -->
     <section class="top-widgets-section">
       <!-- 1. Uhrzeit-Spalte ganz oben -->
       <div class="clock-card glass-panel">
@@ -135,37 +134,30 @@
         <textarea id="quick-scratchpad" class="scratchpad-input" rows="2" placeholder="Kurze Gedanken, Schicht-Notiz oder To-Do direkt hier festhalten…"></textarea>
       </div>
 
-      <!-- 3. Kompakte Filter- & Sortierleiste -->
-      <div class="filter-bar glass-panel">
-        <div class="category-tabs" role="tablist" aria-label="App-Kategorien">
-          <button type="button" class="cat-tab active" data-category="all" role="tab" aria-selected="true">
-            Alle <span class="cat-count">7</span>
-          </button>
-          <button type="button" class="cat-tab" data-category="rettungsdienst" role="tab" aria-selected="false">
-            <span class="cat-dot rd-dot"></span> Rettungsdienst <span class="cat-count">3</span>
-          </button>
-          <button type="button" class="cat-tab" data-category="performance" role="tab" aria-selected="false">
-            <span class="cat-dot perf-dot"></span> Gesundheit &amp; Sport <span class="cat-count">2</span>
-          </button>
-          <button type="button" class="cat-tab" data-category="alltag" role="tab" aria-selected="false">
-            <span class="cat-dot life-dot"></span> Alltag &amp; Technik <span class="cat-count">2</span>
-          </button>
-          <button type="button" class="cat-tab" data-category="pinned" role="tab" aria-selected="false" id="tab-pinned">
-            ★ Favoriten <span class="cat-count" id="pinned-count">0</span>
-          </button>
-        </div>
-
-        <div class="filter-right-controls">
-          <button type="button" class="reorder-toggle-btn" id="reorder-mode-btn" title="Reihenfolge der Apps verschieben">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
-            <span>Anordnung ändern</span>
+      <!-- 3. Filterleiste mit Haken (Checkboxes) zum Ein-/Ausblenden der Bereiche -->
+      <div class="filter-bar glass-panel" role="group" aria-label="Bereiche durch Setzen von Haken filtern">
+        <span class="filter-bar-label">Anzeige:</span>
+        <div class="checkbox-filters" id="checkbox-filters">
+          <button type="button" class="check-filter-chip checked" data-check-cat="rettungsdienst" aria-pressed="true">
+            <span class="check-box" aria-hidden="true">✓</span>
+            <span class="cat-dot rd-dot"></span>
+            <span class="check-label">Rettungsdienst</span>
+            <span class="cat-count">3</span>
           </button>
 
-          <div class="inline-search-wrap">
-            <svg class="inline-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            <input type="search" id="inline-search" class="inline-search-input" placeholder="Apps filtern… (/)" autocomplete="off" />
-            <button type="button" class="inline-search-clear" id="inline-search-clear" hidden aria-label="Filter zurücksetzen">✕</button>
-          </div>
+          <button type="button" class="check-filter-chip checked" data-check-cat="performance" aria-pressed="true">
+            <span class="check-box" aria-hidden="true">✓</span>
+            <span class="cat-dot perf-dot"></span>
+            <span class="check-label">Gesundheit &amp; Sport</span>
+            <span class="cat-count">2</span>
+          </button>
+
+          <button type="button" class="check-filter-chip checked" data-check-cat="alltag" aria-pressed="true">
+            <span class="check-box" aria-hidden="true">✓</span>
+            <span class="cat-dot life-dot"></span>
+            <span class="check-label">Alltag &amp; Technik</span>
+            <span class="cat-count">2</span>
+          </button>
         </div>
       </div>
     </section>
@@ -173,7 +165,7 @@
     <!-- Bento App Grid -->
     <section class="apps-section" aria-label="Deine Web-Apps">
       <div class="bento-grid" id="apps-grid">
-        <!-- Populated dynamically by js/app.js for instant filtering, pinning, sorting & rich interactions -->
+        <!-- Populated dynamically by js/app.js -->
       </div>
     </section>
 
@@ -238,7 +230,7 @@
 
     <!-- App Footer with Version & Build Info -->
     <footer class="dashboard-footer">
-      <span>Command Hub · <strong id="footer-version">v1.2.1</strong></span>
+      <span>Board · <strong id="footer-version">v1.3.0</strong></span>
       <span>·</span>
       <span id="footer-date">Stand 18.11.2026</span>
       <span>·</span>
@@ -257,9 +249,7 @@
         </div>
       </div>
 
-      <div class="cockpit-app-switcher" id="cockpit-switcher" aria-label="Schnellwechsel im Cockpit">
-        <!-- Mini app icons for 1-click switching inside cockpit -->
-      </div>
+      <div class="cockpit-app-switcher" id="cockpit-switcher" aria-label="Schnellwechsel im Cockpit"></div>
 
       <div class="cockpit-controls">
         <button type="button" class="cockpit-btn" id="cockpit-reload" title="App neu laden">
@@ -300,9 +290,7 @@
         <input type="text" id="cmd-input" class="cmd-input" placeholder="App starten, Direktaktion ausführen oder Begriff in Wissen RD suchen…" autocomplete="off" />
         <kbd class="cmd-esc">ESC</kbd>
       </div>
-      <div class="cmd-results" id="cmd-results">
-        <!-- Populated dynamically -->
-      </div>
+      <div class="cmd-results" id="cmd-results"></div>
       <div class="cmd-footer">
         <span><kbd>↑</kbd><kbd>↓</kbd> Navigieren</span>
         <span><kbd>↵</kbd> Öffnen</span>
@@ -312,54 +300,9 @@
     </div>
   </div>
 
-  <!-- iPhone Home-Screen Setup Modal -->
-  <div class="cmd-modal-backdrop" id="ios-modal" hidden>
-    <div class="cmd-modal glass-panel ios-guide-modal" role="dialog" aria-modal="true" aria-labelledby="ios-modal-title">
-      <div class="ios-modal-header">
-        <div class="ios-modal-brand">
-          <img src="icons/apple-touch-icon.png" alt="Dashboard App Icon" class="ios-preview-icon" />
-          <div>
-            <h3 id="ios-modal-title">Als iPhone Home-Button einrichten</h3>
-            <p>Startet im Vollbild wie eine native iOS-App</p>
-          </div>
-        </div>
-        <button type="button" class="cockpit-btn close" id="ios-modal-close" aria-label="Schließen">✕</button>
-      </div>
-      <div class="ios-modal-body">
-        <div class="ios-qr-box">
-          <img id="ios-qr-img" alt="QR-Code für iPhone" class="ios-qr-img" />
-          <span class="ios-qr-caption">Mit der iPhone-Kamera scannen</span>
-        </div>
-        <ol class="ios-steps">
-          <li>
-            <span class="ios-step-num">1</span>
-            <div>
-              <strong>In Safari auf dem iPhone öffnen</strong>
-              <p>Scanne den QR-Code oder rufe <code id="ios-live-url">https://board.vjbackhaus.de/</code> in Safari auf.</p>
-            </div>
-          </li>
-          <li>
-            <span class="ios-step-num">2</span>
-            <div>
-              <strong>Auf „Teilen“ tippen</strong>
-              <p>Tippe unten in der Safari-Leiste auf das Teilen-Symbol (Quadrat mit Pfeil nach oben <svg style="width:14px;height:14px;vertical-align:-2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>).</p>
-            </div>
-          </li>
-          <li>
-            <span class="ios-step-num">3</span>
-            <div>
-              <strong>„Zum Home-Bildschirm“ wählen</strong>
-              <p>Scrolle im Menü leicht nach unten, tippe auf <strong>„Zum Home-Bildschirm“</strong> und oben rechts auf <strong>„Hinzufügen“</strong>.</p>
-            </div>
-          </li>
-        </ol>
-      </div>
-    </div>
-  </div>
-
   <!-- Toast Notification -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
-  <script src="js/app.js?v=8"></script>
+  <script src="js/app.js?v=9"></script>
 </body>
 </html>
