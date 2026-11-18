@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 const APP_BUILD_DATE = '18.11.2026';
 
 const APPS = [
@@ -898,13 +898,28 @@ function initCockpitControls() {
     }
   });
 
-  /* Listen for navigation / close requests sent from embedded apps (e.g. ZNA-Navi) */
+  /* Listen for navigation / close / persistent auth-storage requests sent from embedded apps */
   window.addEventListener('message', (e) => {
     if (!e.data || typeof e.data !== 'object') return;
     if (e.data.type === 'zna-open-url' && e.data.url) {
       window.location.href = e.data.url;
     } else if (e.data.type === 'board-close-cockpit') {
       closeCockpit();
+    } else if (e.data.type === 'board-storage-set' && e.data.key && e.data.value !== undefined) {
+      try {
+        localStorage.setItem('board_vault_' + e.data.key, String(e.data.value));
+      } catch {}
+    } else if (e.data.type === 'board-storage-remove' && e.data.key) {
+      try {
+        localStorage.removeItem('board_vault_' + e.data.key);
+      } catch {}
+    } else if (e.data.type === 'board-storage-get' && e.data.key) {
+      try {
+        const val = localStorage.getItem('board_vault_' + e.data.key);
+        if (val && e.source && typeof e.source.postMessage === 'function') {
+          e.source.postMessage({ type: 'board-storage-value', key: e.data.key, value: val }, '*');
+        }
+      } catch {}
     }
   });
 }

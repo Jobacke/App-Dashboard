@@ -1,5 +1,5 @@
 {
-  "version": "1.5.0",
+  "version": "1.6.0",
   "date": "2026-11-18",
-  "notes": "Zurück-Button '‹ Board' im Cockpit (Safe-Area-angepasst) & direkte Zielanwahl in ZNA-Navi (Waze/Karten)"
+  "notes": "Dauerhafte Sitzungs-Brücke für Gesundheit & Analytics im Cockpit sowie Top-Level Strava-OAuth"
 }
