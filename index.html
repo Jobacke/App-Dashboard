@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Board" />
-  <link rel="manifest" href="manifest.webmanifest?v=14" />
+  <link rel="manifest" href="manifest.webmanifest?v=15" />
   <link rel="icon" type="image/svg+xml" href="icons/dashboard.svg" />
   <link rel="alternate icon" type="image/png" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2" />
@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=14" />
+  <link rel="stylesheet" href="css/style.css?v=15" />
   <script>
     try {
       const savedTheme = localStorage.getItem('dashboard_theme') || 'dark';
@@ -47,7 +47,7 @@
         <div class="brand-text">
           <div class="brand-title-row">
             <span class="brand-title">Board</span>
-            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v1.4.4</span>
+            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v1.5.0</span>
           </div>
           <span class="brand-subtitle">vjbackhaus.de Ecosystem</span>
         </div>
@@ -168,7 +168,7 @@
 
     <!-- App Footer with Version & Build Info -->
     <footer class="dashboard-footer">
-      <span>Board · <strong id="footer-version">v1.4.4</strong></span>
+      <span>Board · <strong id="footer-version">v1.5.0</strong></span>
       <span>·</span>
       <span id="footer-date">Stand 18.11.2026</span>
       <span>·</span>
@@ -179,6 +179,11 @@
   <!-- Integrated Split-View / App Cockpit Drawer -->
   <aside class="cockpit-drawer" id="cockpit-drawer" aria-hidden="true">
     <div class="cockpit-header">
+      <button type="button" class="cockpit-back-btn" id="cockpit-back-board" title="Zurück zum Board (Esc)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        <span>Board</span>
+      </button>
+
       <div class="cockpit-app-info">
         <img src="icons/dashboard.svg" alt="" class="cockpit-app-icon" id="cockpit-icon" />
         <div>
@@ -197,7 +202,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
         </button>
         <a href="#" target="_blank" rel="noopener" class="cockpit-btn primary" id="cockpit-open-external" title="In eigenem Tab öffnen">
-          <span>Neuer Tab</span>
+          <span class="cockpit-ext-label">Tab</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         </a>
         <button type="button" class="cockpit-btn close" id="cockpit-close" title="Cockpit schließen (Esc)">✕</button>
@@ -226,6 +231,6 @@
   <!-- Toast Notification -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
-  <script src="js/app.js?v=14"></script>
+  <script src="js/app.js?v=15"></script>
 </body>
 </html>

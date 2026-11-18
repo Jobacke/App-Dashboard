@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.4.4';
+const APP_VERSION = '1.5.0';
 const APP_BUILD_DATE = '18.11.2026';
 
 const APPS = [
@@ -767,6 +767,11 @@ function initFilterPopover() {
 /* ==========================================================================
    Launching Apps (Tab Mode vs. Integrated Split-Cockpit)
    ========================================================================== */
+function isStandalonePWA() {
+  return (window.navigator.standalone === true) ||
+         (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+}
+
 function triggerAppLaunch(appId, customUrl = null, forceMode = null) {
   const app = APPS.find((a) => a.id === appId);
   if (!app) return;
@@ -776,7 +781,8 @@ function triggerAppLaunch(appId, customUrl = null, forceMode = null) {
 
   recordAppUsage(app);
 
-  if (mode === 'cockpit') {
+  /* In iOS Home-Screen / Standalone mode, always open inside the Cockpit shell so the user has the "‹ Board" back bar and never gets trapped without a back button */
+  if (mode === 'cockpit' || isStandalonePWA()) {
     openCockpit(appId, targetUrl);
   } else {
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
@@ -875,6 +881,7 @@ function closeCockpit() {
 
 function initCockpitControls() {
   document.getElementById('cockpit-close')?.addEventListener('click', closeCockpit);
+  document.getElementById('cockpit-back-board')?.addEventListener('click', closeCockpit);
   document.getElementById('cockpit-backdrop')?.addEventListener('click', closeCockpit);
 
   document.getElementById('cockpit-expand')?.addEventListener('click', () => {
@@ -888,6 +895,16 @@ function initCockpitControls() {
     if (iframe && iframe.src && iframe.src !== 'about:blank') {
       if (loader) loader.hidden = false;
       iframe.src = iframe.src;
+    }
+  });
+
+  /* Listen for navigation / close requests sent from embedded apps (e.g. ZNA-Navi) */
+  window.addEventListener('message', (e) => {
+    if (!e.data || typeof e.data !== 'object') return;
+    if (e.data.type === 'zna-open-url' && e.data.url) {
+      window.location.href = e.data.url;
+    } else if (e.data.type === 'board-close-cockpit') {
+      closeCockpit();
     }
   });
 }

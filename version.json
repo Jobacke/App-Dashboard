@@ -1,5 +1,5 @@
 {
-  "version": "1.4.4",
+  "version": "1.5.0",
   "date": "2026-11-18",
-  "notes": "Standortfreigabe (Geolocation), Mikrofon & App-Deeplinks (Waze/Karten) im Split-Cockpit aktiviert"
+  "notes": "Zurück-Button '‹ Board' im Cockpit (Safe-Area-angepasst) & direkte Zielanwahl in ZNA-Navi (Waze/Karten)"
 }

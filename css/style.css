@@ -1525,35 +1525,74 @@ html[data-theme="light"] .quick-chip {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 18px;
+  gap: 10px;
+  padding: calc(env(safe-area-inset-top) + 12px) 16px 12px;
   border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-glass-strong);
+  flex-shrink: 0;
+}
+
+.cockpit-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  padding: 0 12px 0 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(245, 184, 46, 0.45);
+  background: rgba(245, 184, 46, 0.14);
+  color: var(--accent-gold);
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.16s ease;
+}
+
+.cockpit-back-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.cockpit-back-btn:hover {
+  background: var(--accent-gold);
+  color: #0b0d13;
+  border-color: transparent;
 }
 
 .cockpit-app-info {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   min-width: 0;
+  flex: 1;
 }
 
 .cockpit-app-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .cockpit-app-title {
   font-family: var(--font-display);
-  font-size: 0.96rem;
+  font-size: 0.92rem;
   font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cockpit-app-url {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--text-muted);
   display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cockpit-app-switcher {
@@ -2015,7 +2054,10 @@ html[data-theme="light"] .cmd-item:hover {
   .shortcut-badge {
     display: none;
   }
-  .cockpit-app-switcher {
+  .cockpit-app-switcher,
+  .cockpit-app-url,
+  #cockpit-expand,
+  .cockpit-ext-label {
     display: none;
   }
 }
