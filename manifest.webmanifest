@@ -1,6 +1,6 @@
 {
-  "name": "Command Hub · App-Dashboard",
-  "short_name": "Dashboard",
+  "name": "Board",
+  "short_name": "Board",
   "description": "Zentrales Command-Center für Notizen, Schichttagebuch, Mopped, Gesundheit, ZNA-Navi, Analytics und Wissen.",
   "lang": "de-DE",
   "start_url": "./",

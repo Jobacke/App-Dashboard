@@ -2,7 +2,7 @@
    Command Hub · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 const APP_BUILD_DATE = '18.11.2026';
 
 const APPS = [
