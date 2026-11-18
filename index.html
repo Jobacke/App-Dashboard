@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=4" />
+  <link rel="stylesheet" href="css/style.css?v=6" />
   <script>
     try {
       const savedTheme = localStorage.getItem('dashboard_theme') || 'dark';
@@ -89,78 +89,75 @@
 
   <!-- Main Content Container -->
   <main class="dashboard-main" id="dashboard-main">
-    <!-- Hero Telemetry & Greeting Section -->
-    <section class="hero-section">
-      <div class="hero-greeting-card glass-panel">
-        <div class="hero-top-row">
-          <div class="shift-badge" id="shift-badge">
-            <span class="shift-badge-icon" id="shift-badge-icon">☀️</span>
-            <span id="shift-badge-text">Tagdienst-Fenster</span>
-          </div>
-          <div class="kw-badge" id="kw-badge">KW 47</div>
-        </div>
-        <h1 class="hero-title" id="greeting-title">Guten Morgen, Johannes</h1>
-        <p class="hero-subtitle" id="greeting-subtitle">
-          Alle 7 Web-Apps stehen bereit. Drücke <kbd>1</kbd>–<kbd>7</kbd> für den Sofortstart oder <kbd>⌘K</kbd> für die Schnellsuche.
-        </p>
-
-        <!-- Quick Search / Filter Bar & Category Pills -->
-        <div class="filter-bar">
-          <div class="category-tabs" role="tablist" aria-label="App-Kategorien">
-            <button type="button" class="cat-tab active" data-category="all" role="tab" aria-selected="true">
-              Alle <span class="cat-count">7</span>
-            </button>
-            <button type="button" class="cat-tab" data-category="rettungsdienst" role="tab" aria-selected="false">
-              <span class="cat-dot rd-dot"></span> Rettungsdienst <span class="cat-count">3</span>
-            </button>
-            <button type="button" class="cat-tab" data-category="performance" role="tab" aria-selected="false">
-              <span class="cat-dot perf-dot"></span> Gesundheit &amp; Sport <span class="cat-count">2</span>
-            </button>
-            <button type="button" class="cat-tab" data-category="alltag" role="tab" aria-selected="false">
-              <span class="cat-dot life-dot"></span> Alltag &amp; Technik <span class="cat-count">2</span>
-            </button>
-            <button type="button" class="cat-tab" data-category="pinned" role="tab" aria-selected="false" id="tab-pinned">
-              ★ Favoriten <span class="cat-count" id="pinned-count">0</span>
-            </button>
-          </div>
-
-          <div class="inline-search-wrap">
-            <svg class="inline-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            <input type="search" id="inline-search" class="inline-search-input" placeholder="Apps oder Aktionen filtern… (/)" autocomplete="off" />
-            <button type="button" class="inline-search-clear" id="inline-search-clear" hidden aria-label="Filter zurücksetzen">✕</button>
+    <!-- Top Section: Clock & Date (1st), Quick Memo (2nd), Filter Bar (3rd) -->
+    <section class="top-widgets-section">
+      <!-- 1. Uhrzeit-Spalte ganz oben -->
+      <div class="clock-card glass-panel">
+        <div class="clock-header">
+          <span class="clock-date" id="live-date">Mittwoch, 18. Nov 2026</span>
+          <div class="clock-badges">
+            <span class="kw-badge" id="kw-badge" title="Aktuelle Kalenderwoche">KW 47</span>
+            <span class="clock-tz">MEZ</span>
           </div>
         </div>
-      </div>
-
-      <!-- Live Clock & Quick Scratchpad / Recent Widget -->
-      <div class="hero-side-stack">
-        <div class="clock-card glass-panel">
-          <div class="clock-header">
-            <span class="clock-date" id="live-date">Mittwoch, 18. Nov 2026</span>
-            <span class="clock-tz">MEZ · UTC+1</span>
-          </div>
+        <div class="clock-main-row">
           <div class="clock-time-wrap">
             <span class="clock-time" id="live-time">08:35</span>
             <span class="clock-seconds" id="live-seconds">:00</span>
           </div>
           <div class="clock-footer" id="recent-activity-bar">
-            <span class="recent-label">Zuletzt geöffnet:</span>
-            <span class="recent-app-pill" id="last-opened-pill">Noch keine Sitzung</span>
+            <span class="recent-label">Zuletzt:</span>
+            <span class="recent-app-pill" id="last-opened-pill">Bereit zum Start</span>
           </div>
         </div>
+      </div>
 
-        <div class="scratchpad-card glass-panel">
-          <div class="scratchpad-header">
-            <div class="scratchpad-title-wrap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="scratchpad-icon"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-              <span>Schnell-Memo</span>
-            </div>
-            <div class="scratchpad-actions">
-              <span class="scratchpad-saved" id="scratchpad-status">Gespeichert</span>
-              <a href="https://remembers.vjbackhaus.de/" target="_blank" rel="noopener" class="scratchpad-link" title="In Notizen-App öffnen">→ Notizen</a>
-            </div>
+      <!-- 2. Darunter das Memofenster -->
+      <div class="scratchpad-card glass-panel">
+        <div class="scratchpad-header">
+          <div class="scratchpad-title-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="scratchpad-icon"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            <span>Schnell-Memo</span>
           </div>
-          <textarea id="quick-scratchpad" class="scratchpad-input" rows="2" placeholder="Kurze Gedanken, Schicht-Notiz oder To-Do direkt hier festhalten…"></textarea>
+          <div class="scratchpad-actions">
+            <span class="scratchpad-saved" id="scratchpad-status">Gespeichert</span>
+            <a href="https://remembers.vjbackhaus.de/" target="_blank" rel="noopener" class="scratchpad-link" title="In Notizen-App öffnen">→ Notizen</a>
+          </div>
+        </div>
+        <textarea id="quick-scratchpad" class="scratchpad-input" rows="2" placeholder="Kurze Gedanken, Schicht-Notiz oder To-Do direkt hier festhalten…"></textarea>
+      </div>
+
+      <!-- 3. Kompakte Filter- & Sortierleiste -->
+      <div class="filter-bar glass-panel">
+        <div class="category-tabs" role="tablist" aria-label="App-Kategorien">
+          <button type="button" class="cat-tab active" data-category="all" role="tab" aria-selected="true">
+            Alle <span class="cat-count">7</span>
+          </button>
+          <button type="button" class="cat-tab" data-category="rettungsdienst" role="tab" aria-selected="false">
+            <span class="cat-dot rd-dot"></span> Rettungsdienst <span class="cat-count">3</span>
+          </button>
+          <button type="button" class="cat-tab" data-category="performance" role="tab" aria-selected="false">
+            <span class="cat-dot perf-dot"></span> Gesundheit &amp; Sport <span class="cat-count">2</span>
+          </button>
+          <button type="button" class="cat-tab" data-category="alltag" role="tab" aria-selected="false">
+            <span class="cat-dot life-dot"></span> Alltag &amp; Technik <span class="cat-count">2</span>
+          </button>
+          <button type="button" class="cat-tab" data-category="pinned" role="tab" aria-selected="false" id="tab-pinned">
+            ★ Favoriten <span class="cat-count" id="pinned-count">0</span>
+          </button>
+        </div>
+
+        <div class="filter-right-controls">
+          <button type="button" class="reorder-toggle-btn" id="reorder-mode-btn" title="Reihenfolge der Apps verschieben">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+            <span>Anordnung ändern</span>
+          </button>
+
+          <div class="inline-search-wrap">
+            <svg class="inline-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="search" id="inline-search" class="inline-search-input" placeholder="Apps filtern… (/)" autocomplete="off" />
+            <button type="button" class="inline-search-clear" id="inline-search-clear" hidden aria-label="Filter zurücksetzen">✕</button>
+          </div>
         </div>
       </div>
     </section>
@@ -346,6 +343,6 @@
   <!-- Toast Notification -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
-  <script src="js/app.js"></script>
+  <script src="js/app.js?v=5"></script>
 </body>
 </html>

@@ -5,7 +5,6 @@
 const APPS = [
   {
     id: 'schichttagebuch',
-    key: '1',
     title: 'Schichttagebuch',
     domain: 'schicht.vjbackhaus.de',
     url: 'https://schicht.vjbackhaus.de/',
@@ -27,7 +26,6 @@ const APPS = [
   },
   {
     id: 'wissen',
-    key: '2',
     title: 'Wissen',
     domain: 'wissen.vjbackhaus.de',
     url: 'https://wissen.vjbackhaus.de/',
@@ -51,7 +49,6 @@ const APPS = [
   },
   {
     id: 'zna-navi',
-    key: '3',
     title: 'ZNA-Navi',
     domain: 'zna.vjbackhaus.de',
     url: 'https://zna.vjbackhaus.de/',
@@ -73,7 +70,6 @@ const APPS = [
   },
   {
     id: 'notizen',
-    key: '4',
     title: 'Notizen',
     domain: 'remembers.vjbackhaus.de',
     url: 'https://remembers.vjbackhaus.de/',
@@ -95,7 +91,6 @@ const APPS = [
   },
   {
     id: 'gesundheit',
-    key: '5',
     title: 'Gesundheit',
     domain: 'cockpit.vjbackhaus.de',
     url: 'https://cockpit.vjbackhaus.de/',
@@ -117,7 +112,6 @@ const APPS = [
   },
   {
     id: 'analytics',
-    key: '6',
     title: 'Analytics',
     domain: 'analytics.vjbackhaus.de',
     url: 'https://analytics.vjbackhaus.de/',
@@ -139,7 +133,6 @@ const APPS = [
   },
   {
     id: 'mopped',
-    key: '7',
     title: 'Mopped',
     domain: 'tagebuch.vjbackhaus.de',
     url: 'https://tagebuch.vjbackhaus.de/',
@@ -161,11 +154,28 @@ const APPS = [
   }
 ];
 
+const DEFAULT_ORDER = APPS.map((a) => a.id);
+
+function loadAppOrder() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('dashboard_app_order') || 'null');
+    if (Array.isArray(saved) && saved.length > 0) {
+      const valid = saved.filter((id) => DEFAULT_ORDER.includes(id));
+      const missing = DEFAULT_ORDER.filter((id) => !valid.includes(id));
+      return [...valid, ...missing];
+    }
+  } catch (e) {}
+  return [...DEFAULT_ORDER];
+}
+
 /* State Management */
 const state = {
   category: 'all',
   searchQuery: '',
   launchMode: localStorage.getItem('dashboard_launch_mode') || 'tab',
+  appOrder: loadAppOrder(),
+  reorderMode: false,
+  draggedAppId: null,
   pinned: JSON.parse(localStorage.getItem('dashboard_pinned') || '[]'),
   usageCounts: JSON.parse(localStorage.getItem('dashboard_usage') || '{}'),
   lastOpened: JSON.parse(localStorage.getItem('dashboard_last_opened') || 'null'),
@@ -174,16 +184,59 @@ const state = {
   cmdItems: []
 };
 
+/* Helper: Get all 7 apps sorted strictly by state.appOrder (used by both Board & Dock) */
+function getOrderedApps() {
+  return state.appOrder
+    .map((id, idx) => {
+      const app = APPS.find((a) => a.id === id);
+      return app ? { ...app, key: String(idx + 1) } : null;
+    })
+    .filter(Boolean);
+}
+
+function saveAppOrder() {
+  localStorage.setItem('dashboard_app_order', JSON.stringify(state.appOrder));
+}
+
+function moveAppInOrder(appId, direction) {
+  const idx = state.appOrder.indexOf(appId);
+  if (idx < 0) return;
+  const targetIdx = idx + direction;
+  if (targetIdx < 0 || targetIdx >= state.appOrder.length) return;
+
+  const copy = [...state.appOrder];
+  const [moved] = copy.splice(idx, 1);
+  copy.splice(targetIdx, 0, moved);
+  state.appOrder = copy;
+  saveAppOrder();
+  renderAll();
+}
+
+function reorderAppBefore(sourceId, targetId) {
+  if (!sourceId || !targetId || sourceId === targetId) return;
+  const fromIdx = state.appOrder.indexOf(sourceId);
+  const toIdx = state.appOrder.indexOf(targetId);
+  if (fromIdx < 0 || toIdx < 0) return;
+
+  const copy = [...state.appOrder];
+  const [moved] = copy.splice(fromIdx, 1);
+  copy.splice(toIdx, 0, moved);
+  state.appOrder = copy;
+  saveAppOrder();
+  renderAll();
+}
+
 /* ==========================================================================
    Initialization
    ========================================================================== */
 document.addEventListener('DOMContentLoaded', () => {
   initPlatformKeys();
-  initClockAndGreeting();
+  initClock();
   initLaunchModeControl();
   initThemeToggle();
   initScratchpad();
   initFiltersAndSearch();
+  initReorderModeToggle();
   initWorkflows();
   initCockpitControls();
   initCommandPalette();
@@ -204,7 +257,7 @@ function initPlatformKeys() {
 }
 
 /* ==========================================================================
-   Live Clock, Calendar Week & Contextual Shift Greeting
+   Live Clock & Calendar Week (KW)
    ========================================================================== */
 function getISOWeek(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -214,14 +267,11 @@ function getISOWeek(date) {
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
 
-function initClockAndGreeting() {
+function initClock() {
   const timeEl = document.getElementById('live-time');
   const secEl = document.getElementById('live-seconds');
   const dateEl = document.getElementById('live-date');
   const kwEl = document.getElementById('kw-badge');
-  const greetingTitle = document.getElementById('greeting-title');
-  const shiftIcon = document.getElementById('shift-badge-icon');
-  const shiftText = document.getElementById('shift-badge-text');
 
   function updateClock() {
     const now = new Date();
@@ -240,30 +290,6 @@ function initClockAndGreeting() {
     });
     if (dateEl) dateEl.textContent = dateFormatted;
     if (kwEl) kwEl.textContent = `KW ${getISOWeek(now)}`;
-
-    const h = now.getHours();
-    let greet = 'Guten Tag, Johannes';
-    let sIcon = '☀️';
-    let sText = 'Tagdienst-Fenster (07:00 – 19:00)';
-
-    if (h >= 5 && h < 11) {
-      greet = 'Guten Morgen, Johannes';
-    } else if (h >= 11 && h < 18) {
-      greet = 'Guten Tag, Johannes';
-    } else if (h >= 18 && h < 22) {
-      greet = 'Guten Abend, Johannes';
-    } else {
-      greet = 'Gute Schicht / Nacht, Johannes';
-    }
-
-    if (h >= 19 || h < 7) {
-      sIcon = '🌙';
-      sText = 'Nachtdienst-Fenster (19:00 – 07:00)';
-    }
-
-    if (greetingTitle) greetingTitle.textContent = greet;
-    if (shiftIcon) shiftIcon.textContent = sIcon;
-    if (shiftText) shiftText.textContent = sText;
   }
 
   updateClock();
@@ -283,6 +309,7 @@ function updateLastOpenedDisplay() {
 
 /* ==========================================================================
    Rendering: Bento Grid, Floating Dock & Pinned Count
+   (Strictly synchronized order between Board and Dock!)
    ========================================================================== */
 function renderAll() {
   renderAppsGrid();
@@ -292,7 +319,8 @@ function renderAll() {
 
 function getFilteredApps() {
   const q = state.searchQuery.trim().toLowerCase();
-  return APPS.filter((app) => {
+  const ordered = getOrderedApps();
+  return ordered.filter((app) => {
     if (state.category === 'pinned' && !state.pinned.includes(app.id)) {
       return false;
     }
@@ -332,20 +360,18 @@ function renderAppsGrid() {
     return;
   }
 
-  /* Sort pinned apps first if in 'all' view while preserving default order otherwise */
-  const sorted = [...filtered].sort((a, b) => {
-    const aPin = state.pinned.includes(a.id) ? 1 : 0;
-    const bPin = state.pinned.includes(b.id) ? 1 : 0;
-    return bPin - aPin;
-  });
-
-  grid.innerHTML = sorted.map((app) => {
+  /* Keep exact user-chosen order (`state.appOrder`) so Board & Dock are 100% identical */
+  grid.innerHTML = filtered.map((app) => {
     const isPinned = state.pinned.includes(app.id);
     const wideClass = (app.bentoWide && state.category === 'all' && !state.searchQuery) ? 'bento-wide' : '';
     const opensCount = state.usageCounts[app.id] || 0;
+    const orderIdx = state.appOrder.indexOf(app.id);
+    const isFirst = orderIdx === 0;
+    const isLast = orderIdx === state.appOrder.length - 1;
 
     return `
       <article class="app-card ${wideClass}"
+               draggable="true"
                data-app-id="${app.id}"
                data-contrast="${app.contrast}"
                style="--app-accent: ${app.accent}; --app-glow: ${app.glow}; --app-border: ${app.border};">
@@ -365,6 +391,22 @@ function renderAppsGrid() {
           </div>
 
           <div class="card-meta-actions">
+            <div class="move-controls" role="group" aria-label="Position ändern">
+              <button type="button"
+                      class="move-btn"
+                      data-action="move-prev"
+                      data-app-id="${app.id}"
+                      ${isFirst ? 'disabled' : ''}
+                      title="Nach vorne / links verschieben"
+                      aria-label="Nach links verschieben">←</button>
+              <button type="button"
+                      class="move-btn"
+                      data-action="move-next"
+                      data-app-id="${app.id}"
+                      ${isLast ? 'disabled' : ''}
+                      title="Nach hinten / rechts verschieben"
+                      aria-label="Nach rechts verschieben">→</button>
+            </div>
             <span class="shortcut-badge" title="Tastatur-Direktwahl: Taste ${app.key}">${app.key}</span>
             <button type="button"
                     class="card-action-btn ${isPinned ? 'pinned' : ''}"
@@ -437,6 +479,8 @@ function renderAppsGrid() {
 function attachCardListeners() {
   const cards = document.querySelectorAll('.app-card');
   cards.forEach((card) => {
+    const appId = card.dataset.appId;
+
     /* Cursor-follow radial glow */
     card.addEventListener('mousemove', (e) => {
       const rect = card.getBoundingClientRect();
@@ -444,13 +488,70 @@ function attachCardListeners() {
       card.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
     });
 
-    /* Card click launches app */
+    /* Drag & Drop Reordering on Cards */
+    card.addEventListener('dragstart', (e) => {
+      state.draggedAppId = appId;
+      card.classList.add('dragging');
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', appId);
+      }
+    });
+
+    card.addEventListener('dragend', () => {
+      state.draggedAppId = null;
+      card.classList.remove('dragging');
+      document.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'));
+    });
+
+    card.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (state.draggedAppId && state.draggedAppId !== appId) {
+        card.classList.add('drag-over');
+      }
+    });
+
+    card.addEventListener('dragleave', () => {
+      card.classList.remove('drag-over');
+    });
+
+    card.addEventListener('drop', (e) => {
+      e.preventDefault();
+      card.classList.remove('drag-over');
+      const sourceId = state.draggedAppId || e.dataTransfer?.getData('text/plain');
+      if (sourceId && sourceId !== appId) {
+        reorderAppBefore(sourceId, appId);
+        showToast('Reihenfolge im Board & Dock aktualisiert');
+      }
+    });
+
+    /* Card click launches app (unless in reorder mode or clicking controls) */
     card.addEventListener('click', (e) => {
-      if (e.target.closest('[data-action]') || e.target.closest('form') || e.target.closest('[data-quick-link]') || e.target.closest('[data-launch-btn]')) {
+      if (
+        e.target.closest('[data-action]') ||
+        e.target.closest('form') ||
+        e.target.closest('[data-quick-link]') ||
+        e.target.closest('[data-launch-btn]')
+      ) {
         return;
       }
-      const appId = card.dataset.appId;
+      if (state.reorderMode) return;
       triggerAppLaunch(appId);
+    });
+  });
+
+  /* Move Left / Right buttons */
+  document.querySelectorAll('[data-action="move-prev"]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      moveAppInOrder(btn.dataset.appId, -1);
+    });
+  });
+
+  document.querySelectorAll('[data-action="move-next"]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      moveAppInOrder(btn.dataset.appId, 1);
     });
   });
 
@@ -509,21 +610,106 @@ function renderDock() {
   const dock = document.getElementById('dock-inner');
   if (!dock) return;
 
-  dock.innerHTML = APPS.map((app) => `
-    <button type="button"
-            class="dock-item ${state.activeCockpitAppId === app.id ? 'active' : ''}"
-            data-dock-app="${app.id}"
-            data-title="${escapeHtml(app.title)} (${app.key})"
-            aria-label="${escapeHtml(app.title)} öffnen">
-      <img src="${app.icon}" alt="${escapeHtml(app.title)}" />
-      <span class="dock-dot"></span>
-    </button>
-  `).join('');
+  const ordered = getOrderedApps();
 
-  dock.querySelectorAll('[data-dock-app]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      triggerAppLaunch(btn.dataset.dockApp);
+  dock.innerHTML = ordered.map((app, idx) => {
+    const isFirst = idx === 0;
+    const isLast = idx === ordered.length - 1;
+    return `
+      <div class="dock-item ${state.activeCockpitAppId === app.id ? 'active' : ''}"
+           draggable="true"
+           role="button"
+           tabindex="0"
+           data-dock-app="${app.id}"
+           data-title="${escapeHtml(app.title)} (${app.key})"
+           aria-label="${escapeHtml(app.title)} öffnen">
+        <div class="dock-move-arrows">
+          <button type="button" class="dock-arrow-btn" data-dock-move="-1" data-app-id="${app.id}" ${isFirst ? 'disabled' : ''} aria-label="Links">◀</button>
+          <button type="button" class="dock-arrow-btn" data-dock-move="1" data-app-id="${app.id}" ${isLast ? 'disabled' : ''} aria-label="Rechts">▶</button>
+        </div>
+        <img src="${app.icon}" alt="${escapeHtml(app.title)}" />
+        <span class="dock-dot"></span>
+      </div>
+    `;
+  }).join('');
+
+  dock.querySelectorAll('[data-dock-move]').forEach((arrowBtn) => {
+    arrowBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      moveAppInOrder(arrowBtn.dataset.appId, Number(arrowBtn.dataset.dockMove));
     });
+  });
+
+  dock.querySelectorAll('[data-dock-app]').forEach((item) => {
+    const appId = item.dataset.dockApp;
+
+    item.addEventListener('click', (e) => {
+      if (e.target.closest('[data-dock-move]')) return;
+      if (state.reorderMode) return;
+      triggerAppLaunch(appId);
+    });
+
+    item.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        triggerAppLaunch(appId);
+      }
+    });
+
+    /* Drag & Drop on Dock Items */
+    item.addEventListener('dragstart', (e) => {
+      state.draggedAppId = appId;
+      item.classList.add('dragging');
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', appId);
+      }
+    });
+
+    item.addEventListener('dragend', () => {
+      state.draggedAppId = null;
+      item.classList.remove('dragging');
+      document.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'));
+    });
+
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (state.draggedAppId && state.draggedAppId !== appId) {
+        item.classList.add('drag-over');
+      }
+    });
+
+    item.addEventListener('dragleave', () => {
+      item.classList.remove('drag-over');
+    });
+
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      item.classList.remove('drag-over');
+      const sourceId = state.draggedAppId || e.dataTransfer?.getData('text/plain');
+      if (sourceId && sourceId !== appId) {
+        reorderAppBefore(sourceId, appId);
+        showToast('Reihenfolge im Dock & Board aktualisiert');
+      }
+    });
+  });
+}
+
+function initReorderModeToggle() {
+  const btn = document.getElementById('reorder-mode-btn');
+  btn?.addEventListener('click', () => {
+    state.reorderMode = !state.reorderMode;
+    document.body.classList.toggle('reorder-active', state.reorderMode);
+    btn.classList.toggle('active', state.reorderMode);
+    const span = btn.querySelector('span');
+    if (span) {
+      span.textContent = state.reorderMode ? 'Anordnung fertig' : 'Anordnung ändern';
+    }
+    showToast(
+      state.reorderMode
+        ? 'Verschiebe-Modus aktiv: Nutze ◀ ▶ oder Ziehen zum Sortieren'
+        : 'Neue Reihenfolge gespeichert ✓'
+    );
   });
 }
 
@@ -609,7 +795,8 @@ function openCockpit(appId, customUrl = null) {
   if (extLink) extLink.href = finalUrl;
 
   if (switcher) {
-    switcher.innerHTML = APPS.map((item) => `
+    const ordered = getOrderedApps();
+    switcher.innerHTML = ordered.map((item) => `
       <button type="button"
               class="cockpit-switch-btn ${item.id === app.id ? 'active' : ''}"
               data-switch-app="${item.id}"
@@ -799,9 +986,7 @@ function initLivePingButton() {
         try {
           await fetch(app.url, { mode: 'no-cors', cache: 'no-store' });
           onlineCount++;
-        } catch (err) {
-          /* Even if offline, count reachable or mark */
-        }
+        } catch (err) {}
       })
     );
 
@@ -881,8 +1066,9 @@ function renderCommandResults(query) {
 
   const q = query.trim().toLowerCase();
   const items = [];
+  const ordered = getOrderedApps();
 
-  APPS.forEach((app) => {
+  ordered.forEach((app) => {
     const matchText = `${app.title} ${app.domain} ${app.categoryLabel} ${app.keywords}`.toLowerCase();
     if (!q || matchText.includes(q)) {
       items.push({
@@ -897,7 +1083,6 @@ function renderCommandResults(query) {
     }
   });
 
-  /* Direct deep-action items */
   const extraCommands = [
     {
       type: 'custom',
@@ -923,7 +1108,6 @@ function renderCommandResults(query) {
     }
   });
 
-  /* Always offer direct lookup in Wissen RD when a query is typed */
   if (q.length >= 2) {
     items.push({
       type: 'custom',
@@ -1041,6 +1225,10 @@ function initGlobalShortcuts() {
         closeCockpit();
         return;
       }
+      if (state.reorderMode) {
+        document.getElementById('reorder-mode-btn')?.click();
+        return;
+      }
     }
 
     if (isTyping) return;
@@ -1053,7 +1241,8 @@ function initGlobalShortcuts() {
 
     if (!e.metaKey && !e.ctrlKey && !e.altKey && /^[1-7]$/.test(e.key)) {
       e.preventDefault();
-      const targetApp = APPS.find((a) => a.key === e.key);
+      const ordered = getOrderedApps();
+      const targetApp = ordered[Number(e.key) - 1];
       if (targetApp) {
         triggerAppLaunch(targetApp.id);
       }
