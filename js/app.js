@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const APP_BUILD_DATE = '18.11.2026';
 
 const APPS = [
@@ -172,20 +172,20 @@ function loadAppOrder() {
   return [...DEFAULT_ORDER];
 }
 
-function loadCheckedCategories() {
+function loadVisibleApps() {
   try {
-    const saved = JSON.parse(localStorage.getItem('dashboard_checked_cats') || 'null');
+    const saved = JSON.parse(localStorage.getItem('dashboard_visible_apps') || 'null');
     if (Array.isArray(saved)) {
-      const valid = saved.filter((c) => ALL_CATEGORIES.includes(c));
+      const valid = saved.filter((id) => DEFAULT_ORDER.includes(id));
       if (valid.length > 0) return valid;
     }
   } catch (e) {}
-  return [...ALL_CATEGORIES];
+  return [...DEFAULT_ORDER];
 }
 
 /* State Management */
 const state = {
-  checkedCategories: loadCheckedCategories(),
+  visibleApps: loadVisibleApps(),
   launchMode: localStorage.getItem('dashboard_launch_mode') || 'tab',
   appOrder: loadAppOrder(),
   draggedAppId: null,
@@ -247,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initLaunchModeControl();
   initThemeToggle();
   initScratchpad();
-  initCheckboxFilters();
+  initFilterPopover();
   initWorkflows();
   initCockpitControls();
   initCommandPalette();
@@ -325,12 +325,12 @@ function updateLastOpenedDisplay() {
 function renderAll() {
   renderAppsGrid();
   renderDock();
-  syncCheckboxFilterUI();
+  renderFilterPopoverList();
 }
 
 function getFilteredApps() {
   const ordered = getOrderedApps();
-  return ordered.filter((app) => state.checkedCategories.includes(app.category));
+  return ordered.filter((app) => state.visibleApps.includes(app.id));
 }
 
 function renderAppsGrid() {
@@ -342,22 +342,22 @@ function renderAppsGrid() {
   if (filtered.length === 0) {
     grid.innerHTML = `
       <div class="glass-panel" style="grid-column: span 12; padding: 36px; text-align: center;">
-        <p style="font-size: 1.05rem; font-weight: 600; margin-bottom: 6px;">Alle Kategorien sind ausgeblendet</p>
+        <p style="font-size: 1.05rem; font-weight: 600; margin-bottom: 6px;">Alle Apps sind ausgeblendet</p>
         <p style="color: var(--text-secondary); font-size: 0.86rem; margin-bottom: 14px;">
-          Setze oben wieder mindestens einen Haken, um die Apps einzublenden.
+          Wähle oben im Filter-Menü wieder Apps aus oder aktiviere direkt alle 7 Apps.
         </p>
-        <button type="button" class="launch-cta" id="reset-filter-btn" style="cursor:pointer;">Alle Haken aktivieren</button>
+        <button type="button" class="launch-cta" id="reset-filter-btn" style="cursor:pointer;">Alle 7 Apps einblenden</button>
       </div>
     `;
     document.getElementById('reset-filter-btn')?.addEventListener('click', () => {
-      state.checkedCategories = [...ALL_CATEGORIES];
-      localStorage.setItem('dashboard_checked_cats', JSON.stringify(state.checkedCategories));
+      state.visibleApps = [...DEFAULT_ORDER];
+      localStorage.setItem('dashboard_visible_apps', JSON.stringify(state.visibleApps));
       renderAll();
     });
     return;
   }
 
-  const allSelected = state.checkedCategories.length === ALL_CATEGORIES.length;
+  const allSelected = state.visibleApps.length === DEFAULT_ORDER.length;
 
   grid.innerHTML = filtered.map((app) => {
     const wideClass = (app.bentoWide && allSelected) ? 'bento-wide' : '';
@@ -592,10 +592,10 @@ function renderDock() {
   const ordered = getOrderedApps();
 
   dock.innerHTML = ordered.map((app) => {
-    const isCategoryVisible = state.checkedCategories.includes(app.category);
+    const isVisible = state.visibleApps.includes(app.id);
     return `
       <div class="dock-item ${state.activeCockpitAppId === app.id ? 'active' : ''}"
-           style="${isCategoryVisible ? '' : 'opacity: 0.35;'}"
+           style="${isVisible ? '' : 'opacity: 0.32;'}"
            draggable="true"
            role="button"
            tabindex="0"
@@ -662,30 +662,116 @@ function renderDock() {
 }
 
 /* ==========================================================================
-   Checkbox Category Filter (Haken setzen / abwählen)
+   Compact Header Filter Popover (Individual App Checkboxes + Presets)
    ========================================================================== */
-function syncCheckboxFilterUI() {
-  document.querySelectorAll('[data-check-cat]').forEach((chip) => {
-    const cat = chip.dataset.checkCat;
-    const isChecked = state.checkedCategories.includes(cat);
-    chip.classList.toggle('checked', isChecked);
-    chip.setAttribute('aria-pressed', isChecked ? 'true' : 'false');
+function saveVisibleApps() {
+  localStorage.setItem('dashboard_visible_apps', JSON.stringify(state.visibleApps));
+}
+
+function renderFilterPopoverList() {
+  const listEl = document.getElementById('filter-popover-list');
+  const countEl = document.getElementById('filter-trigger-count');
+  const triggerBtn = document.getElementById('filter-popover-btn');
+
+  const ordered = getOrderedApps();
+  const visibleCount = state.visibleApps.length;
+
+  if (countEl) countEl.textContent = `${visibleCount}/${ordered.length}`;
+  if (triggerBtn) {
+    triggerBtn.classList.toggle('filtered', visibleCount < ordered.length);
+  }
+
+  /* Update category preset pill active states */
+  document.querySelectorAll('[data-preset-cat]').forEach((pill) => {
+    const cat = pill.dataset.presetCat;
+    const catApps = APPS.filter((a) => a.category === cat).map((a) => a.id);
+    const allCatVisible = catApps.every((id) => state.visibleApps.includes(id));
+    pill.classList.toggle('active', allCatVisible);
+  });
+
+  if (!listEl) return;
+
+  listEl.innerHTML = ordered.map((app) => {
+    const checked = state.visibleApps.includes(app.id);
+    return `
+      <div class="filter-app-row ${checked ? 'checked' : ''}"
+           role="checkbox"
+           aria-checked="${checked ? 'true' : 'false'}"
+           tabindex="0"
+           data-filter-app="${app.id}">
+        <div class="filter-app-left">
+          <img src="${app.icon}" alt="" />
+          <span class="filter-app-name">${escapeHtml(app.title)}</span>
+        </div>
+        <span class="check-box" aria-hidden="true">✓</span>
+      </div>
+    `;
+  }).join('');
+
+  listEl.querySelectorAll('[data-filter-app]').forEach((row) => {
+    row.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const appId = row.dataset.filterApp;
+      const idx = state.visibleApps.indexOf(appId);
+      if (idx >= 0) {
+        state.visibleApps.splice(idx, 1);
+      } else {
+        state.visibleApps.push(appId);
+      }
+      saveVisibleApps();
+      renderAll();
+    });
   });
 }
 
-function initCheckboxFilters() {
-  document.querySelectorAll('[data-check-cat]').forEach((chip) => {
-    chip.addEventListener('click', () => {
-      const cat = chip.dataset.checkCat;
-      const idx = state.checkedCategories.indexOf(cat);
-      if (idx >= 0) {
-        state.checkedCategories.splice(idx, 1);
+function initFilterPopover() {
+  const wrap = document.getElementById('filter-popover-wrap');
+  const btn = document.getElementById('filter-popover-btn');
+  const popover = document.getElementById('filter-popover');
+  const selectAllBtn = document.getElementById('filter-select-all');
+
+  btn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!popover) return;
+    const isHidden = popover.hidden;
+    popover.hidden = !isHidden;
+    btn.classList.toggle('active', isHidden);
+    btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+  });
+
+  selectAllBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    state.visibleApps = [...DEFAULT_ORDER];
+    saveVisibleApps();
+    renderAll();
+  });
+
+  document.querySelectorAll('[data-preset-cat]').forEach((pill) => {
+    pill.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const cat = pill.dataset.presetCat;
+      const catAppIds = APPS.filter((a) => a.category === cat).map((a) => a.id);
+      const allCatVisible = catAppIds.every((id) => state.visibleApps.includes(id));
+
+      if (allCatVisible) {
+        /* Toggle off this category's apps */
+        state.visibleApps = state.visibleApps.filter((id) => !catAppIds.includes(id));
       } else {
-        state.checkedCategories.push(cat);
+        /* Enable this category's apps */
+        const merged = new Set([...state.visibleApps, ...catAppIds]);
+        state.visibleApps = [...merged];
       }
-      localStorage.setItem('dashboard_checked_cats', JSON.stringify(state.checkedCategories));
+      saveVisibleApps();
       renderAll();
     });
+  });
+
+  document.addEventListener('click', (e) => {
+    if (popover && !popover.hidden && wrap && !wrap.contains(e.target)) {
+      popover.hidden = true;
+      btn?.classList.remove('active');
+      btn?.setAttribute('aria-expanded', 'false');
+    }
   });
 }
 

@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Board" />
-  <link rel="manifest" href="manifest.webmanifest?v=9" />
+  <link rel="manifest" href="manifest.webmanifest?v=10" />
   <link rel="icon" type="image/svg+xml" href="icons/dashboard.svg" />
   <link rel="alternate icon" type="image/png" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2" />
@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=9" />
+  <link rel="stylesheet" href="css/style.css?v=10" />
   <script>
     try {
       const savedTheme = localStorage.getItem('dashboard_theme') || 'dark';
@@ -47,7 +47,7 @@
         <div class="brand-text">
           <div class="brand-title-row">
             <span class="brand-title">Board</span>
-            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v1.3.0</span>
+            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v1.4.0</span>
           </div>
           <span class="brand-subtitle">vjbackhaus.de Ecosystem</span>
         </div>
@@ -76,6 +76,36 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
             <span>Cockpit</span>
           </button>
+        </div>
+
+        <!-- Compact Filter Popover Button in Header -->
+        <div class="filter-popover-wrap" id="filter-popover-wrap">
+          <button type="button" class="filter-trigger-btn" id="filter-popover-btn" title="Sichtbare Apps auswählen" aria-expanded="false" aria-haspopup="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+              <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+              <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+            </svg>
+            <span class="filter-trigger-count" id="filter-trigger-count">7/7</span>
+          </button>
+
+          <div class="filter-popover glass-panel" id="filter-popover" hidden role="dialog" aria-label="Sichtbare Apps filtern">
+            <div class="filter-popover-header">
+              <span class="filter-popover-title">Sichtbare Apps</span>
+              <div class="filter-popover-quick">
+                <button type="button" class="filter-mini-link" id="filter-select-all">Alle</button>
+              </div>
+            </div>
+            <div class="filter-popover-cats">
+              <button type="button" class="filter-cat-pill" data-preset-cat="rettungsdienst">RD</button>
+              <button type="button" class="filter-cat-pill" data-preset-cat="performance">Sport &amp; Vital</button>
+              <button type="button" class="filter-cat-pill" data-preset-cat="alltag">Alltag</button>
+            </div>
+            <div class="filter-popover-list" id="filter-popover-list">
+              <!-- Populated dynamically with all 7 apps + checkboxes -->
+            </div>
+          </div>
         </div>
 
         <button type="button" class="icon-btn" id="theme-toggle" title="Design wechseln (Dark / Light)" aria-label="Design wechseln">
@@ -132,33 +162,6 @@
           </div>
         </div>
         <textarea id="quick-scratchpad" class="scratchpad-input" rows="2" placeholder="Kurze Gedanken, Schicht-Notiz oder To-Do direkt hier festhalten…"></textarea>
-      </div>
-
-      <!-- 3. Filterleiste mit Haken (Checkboxes) zum Ein-/Ausblenden der Bereiche -->
-      <div class="filter-bar glass-panel" role="group" aria-label="Bereiche durch Setzen von Haken filtern">
-        <span class="filter-bar-label">Anzeige:</span>
-        <div class="checkbox-filters" id="checkbox-filters">
-          <button type="button" class="check-filter-chip checked" data-check-cat="rettungsdienst" aria-pressed="true">
-            <span class="check-box" aria-hidden="true">✓</span>
-            <span class="cat-dot rd-dot"></span>
-            <span class="check-label">Rettungsdienst</span>
-            <span class="cat-count">3</span>
-          </button>
-
-          <button type="button" class="check-filter-chip checked" data-check-cat="performance" aria-pressed="true">
-            <span class="check-box" aria-hidden="true">✓</span>
-            <span class="cat-dot perf-dot"></span>
-            <span class="check-label">Gesundheit &amp; Sport</span>
-            <span class="cat-count">2</span>
-          </button>
-
-          <button type="button" class="check-filter-chip checked" data-check-cat="alltag" aria-pressed="true">
-            <span class="check-box" aria-hidden="true">✓</span>
-            <span class="cat-dot life-dot"></span>
-            <span class="check-label">Alltag &amp; Technik</span>
-            <span class="cat-count">2</span>
-          </button>
-        </div>
       </div>
     </section>
 
@@ -230,7 +233,7 @@
 
     <!-- App Footer with Version & Build Info -->
     <footer class="dashboard-footer">
-      <span>Board · <strong id="footer-version">v1.3.0</strong></span>
+      <span>Board · <strong id="footer-version">v1.4.0</strong></span>
       <span>·</span>
       <span id="footer-date">Stand 18.11.2026</span>
       <span>·</span>
@@ -303,6 +306,6 @@
   <!-- Toast Notification -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
-  <script src="js/app.js?v=9"></script>
+  <script src="js/app.js?v=10"></script>
 </body>
 </html>

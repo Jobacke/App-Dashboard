@@ -675,66 +675,194 @@ html[data-theme="light"] .icon-sun { display: none; }
   border-color: rgba(245, 184, 46, 0.5);
 }
 
-/* Filter Bar with Checkboxes (Haken) */
-.filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 18px;
+/* Compact Filter Popover in Header (0px space in board) */
+.filter-popover-wrap {
+  position: relative;
 }
 
-.filter-bar-label {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.checkbox-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  flex: 1;
-}
-
-.check-filter-chip {
+.filter-trigger-btn {
+  height: 36px;
+  padding: 0 11px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-input);
+  color: var(--text-primary);
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 14px;
-  border-radius: 12px;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-trigger-btn svg {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+}
+
+.filter-trigger-btn:hover,
+.filter-trigger-btn.active {
+  border-color: var(--border-highlight);
+  background: var(--bg-card-hover);
+}
+
+.filter-trigger-btn.filtered {
+  border-color: rgba(245, 184, 46, 0.5);
+  background: rgba(245, 184, 46, 0.12);
+}
+
+.filter-trigger-btn.filtered svg,
+.filter-trigger-btn.filtered .filter-trigger-count {
+  color: var(--accent-gold);
+}
+
+.filter-trigger-count {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.filter-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 284px;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--bg-glass-strong);
+  border: 1px solid var(--border-highlight);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.65);
+  z-index: 75;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: popIn 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.filter-popover[hidden] {
+  display: none;
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.filter-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+
+.filter-popover-title {
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.filter-mini-link {
+  border: none;
+  background: transparent;
+  color: var(--accent-gold);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filter-mini-link:hover {
+  text-decoration: underline;
+}
+
+.filter-popover-cats {
+  display: flex;
+  gap: 6px;
+}
+
+.filter-cat-pill {
+  flex: 1;
+  padding: 5px 6px;
+  border-radius: 8px;
   border: 1px solid var(--border-subtle);
   background: var(--bg-input);
   color: var(--text-secondary);
-  font-size: 0.82rem;
+  font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-cat-pill:hover {
+  color: var(--text-primary);
+  border-color: var(--border-highlight);
+}
+
+.filter-cat-pill.active {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  border-color: var(--border-highlight);
+}
+
+.filter-popover-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-app-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: 11px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary);
+  cursor: pointer;
   user-select: none;
-  opacity: 0.55;
-  transition: all 0.18s ease;
+  transition: all 0.15s ease;
 }
 
-.check-filter-chip:hover {
-  border-color: var(--border-highlight);
-  color: var(--text-primary);
-}
-
-.check-filter-chip.checked {
-  opacity: 1;
+.filter-app-row:hover {
   background: rgba(255, 255, 255, 0.08);
-  border-color: var(--border-highlight);
   color: var(--text-primary);
 }
 
-html[data-theme="light"] .check-filter-chip.checked {
-  background: rgba(15, 23, 42, 0.06);
+.filter-app-row.checked {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-subtle);
+}
+
+.filter-app-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.filter-app-left img {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  flex-shrink: 0;
+}
+
+.filter-app-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .check-box {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
   border-radius: 5px;
   border: 1.5px solid var(--text-muted);
   display: inline-grid;
@@ -743,33 +871,16 @@ html[data-theme="light"] .check-filter-chip.checked {
   font-weight: 800;
   color: transparent;
   background: transparent;
-  transition: all 0.16s ease;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
 }
 
-.check-filter-chip.checked .check-box {
+.filter-app-row.checked .check-box {
   background: var(--accent-emerald);
   border-color: var(--accent-emerald);
   color: #080a0f;
   box-shadow: 0 0 8px rgba(16, 185, 129, 0.35);
 }
-
-.cat-count {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  opacity: 0.75;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: rgba(128, 128, 128, 0.2);
-}
-
-.cat-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-}
-.rd-dot { background: #ff2a5c; box-shadow: 0 0 6px #ff2a5c; }
-.perf-dot { background: #ff6b2b; box-shadow: 0 0 6px #ff6b2b; }
-.life-dot { background: #eab308; box-shadow: 0 0 6px #eab308; }
 
 /* ==========================================================================
    Bento App Grid & Interactive App Cards

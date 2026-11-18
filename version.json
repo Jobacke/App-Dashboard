@@ -1,5 +1,5 @@
 {
-  "version": "1.3.0",
+  "version": "1.4.0",
   "date": "2026-11-18",
-  "notes": "Filter per Haken, Favoriten/Suchfeld/Homebutton-Hinweis entfernt, Auto-Update-Banner beim Laden"
+  "notes": "Kompaktes Filter-Popover im Header (0px Platzverbrauch im Board, alle 7 Apps einzeln per Haken schaltbar)"
 }
