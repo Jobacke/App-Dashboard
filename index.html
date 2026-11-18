@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=6" />
+  <link rel="stylesheet" href="css/style.css?v=7" />
   <script>
     try {
       const savedTheme = localStorage.getItem('dashboard_theme') || 'dark';
@@ -45,7 +45,10 @@
           <span class="brand-pulse"></span>
         </div>
         <div class="brand-text">
-          <span class="brand-title">Command Hub</span>
+          <div class="brand-title-row">
+            <span class="brand-title">Command Hub</span>
+            <span class="version-badge" id="app-version-badge" title="Installierte Dashboard-Version (Tippen zum Prüfen auf Updates)">v1.2.0</span>
+          </div>
           <span class="brand-subtitle">vjbackhaus.de Ecosystem</span>
         </div>
       </div>
@@ -86,6 +89,11 @@
       </div>
     </div>
   </header>
+
+  <!-- Update Available Banner -->
+  <button type="button" id="update-banner" class="update-banner" hidden>
+    🔄 Neue Version <span id="update-version-text"></span> verfügbar – hier tippen zum Aktualisieren
+  </button>
 
   <!-- Main Content Container -->
   <main class="dashboard-main" id="dashboard-main">
@@ -227,6 +235,15 @@
         </button>
       </div>
     </section>
+
+    <!-- App Footer with Version & Build Info -->
+    <footer class="dashboard-footer">
+      <span>Command Hub · <strong id="footer-version">v1.2.0</strong></span>
+      <span>·</span>
+      <span id="footer-date">Stand 18.11.2026</span>
+      <span>·</span>
+      <button type="button" class="footer-check-btn" id="footer-update-check">Auf Update prüfen</button>
+    </footer>
   </main>
 
   <!-- Integrated Split-View / App Cockpit Drawer -->
@@ -343,6 +360,6 @@
   <!-- Toast Notification -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
-  <script src="js/app.js?v=5"></script>
+  <script src="js/app.js?v=7"></script>
 </body>
 </html>

@@ -2,6 +2,9 @@
    Command Hub · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
+const APP_VERSION = '1.2.0';
+const APP_BUILD_DATE = '18.11.2026';
+
 const APPS = [
   {
     id: 'schichttagebuch',
@@ -243,6 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initIosInstallModal();
   initGlobalShortcuts();
   initLivePingButton();
+  initVersionDisplayAndUpdateCheck();
 
   renderAll();
   registerServiceWorker();
@@ -1279,4 +1283,68 @@ function registerServiceWorker() {
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+}
+
+/* ==========================================================================
+   Version Display & Remote Version Check
+   ========================================================================== */
+function isVersionNewer(remoteVer, localVer) {
+  const r = String(remoteVer).split('.').map((n) => parseInt(n, 10) || 0);
+  const l = String(localVer).split('.').map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(r.length, l.length); i++) {
+    if ((r[i] || 0) > (l[i] || 0)) return true;
+    if ((r[i] || 0) < (l[i] || 0)) return false;
+  }
+  return false;
+}
+
+function initVersionDisplayAndUpdateCheck() {
+  const headerBadge = document.getElementById('app-version-badge');
+  const footerVer = document.getElementById('footer-version');
+  const footerDate = document.getElementById('footer-date');
+  const footerBtn = document.getElementById('footer-update-check');
+  const updateBanner = document.getElementById('update-banner');
+  const updateText = document.getElementById('update-version-text');
+
+  if (headerBadge) headerBadge.textContent = `v${APP_VERSION}`;
+  if (footerVer) footerVer.textContent = `v${APP_VERSION}`;
+  if (footerDate) footerDate.textContent = `Stand ${APP_BUILD_DATE}`;
+
+  async function checkRemoteVersion(manual = false) {
+    try {
+      const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.version && isVersionNewer(data.version, APP_VERSION)) {
+        if (updateText) updateText.textContent = `v${data.version}`;
+        if (updateBanner) updateBanner.hidden = false;
+        if (manual) showToast(`Neue Version v${data.version} verfügbar!`);
+      } else if (manual) {
+        showToast(`Version v${APP_VERSION} ist aktuell ✓`);
+      }
+    } catch (e) {
+      if (manual) showToast(`Installierte Version: v${APP_VERSION}`);
+    }
+  }
+
+  async function forceReloadUpdate() {
+    showToast('Aktualisiere auf neueste Version…');
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+    } catch (e) {}
+    location.reload();
+  }
+
+  headerBadge?.addEventListener('click', () => checkRemoteVersion(true));
+  footerBtn?.addEventListener('click', () => checkRemoteVersion(true));
+  updateBanner?.addEventListener('click', forceReloadUpdate);
+
+  checkRemoteVersion(false);
 }

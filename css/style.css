@@ -238,12 +238,81 @@ html[data-theme="light"] kbd {
   flex-direction: column;
 }
 
+.brand-title-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
 .brand-title {
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 1.08rem;
   letter-spacing: -0.02em;
   line-height: 1.15;
+}
+
+.version-badge {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(245, 184, 46, 0.12);
+  border: 1px solid rgba(245, 184, 46, 0.32);
+  color: var(--accent-gold);
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.version-badge:hover {
+  background: rgba(245, 184, 46, 0.24);
+}
+
+.update-banner {
+  display: block;
+  width: calc(100% - 32px);
+  max-width: 1332px;
+  margin: 12px auto 0;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(245, 184, 46, 0.5);
+  background: linear-gradient(135deg, rgba(245, 184, 46, 0.2), rgba(255, 42, 92, 0.2));
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.update-banner[hidden] {
+  display: none;
+}
+
+.dashboard-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px 4px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.footer-check-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.footer-check-btn:hover {
+  color: var(--accent-gold);
 }
 
 .brand-subtitle {
