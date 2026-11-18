@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const APP_BUILD_DATE = '18.11.2026';
 
 const APPS = [
@@ -934,13 +934,29 @@ function initThemeToggle() {
   });
 }
 
+function resetMobileViewportZoom() {
+  const vp = document.getElementById('viewport-meta') || document.querySelector('meta[name="viewport"]');
+  if (!vp) return;
+  /* Temporarily lock maximum-scale=1.0 to force iOS WebKit back to 1.0x zoom, then restore normal pinch-zoom */
+  vp.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover');
+  setTimeout(() => {
+    vp.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
+    window.scrollTo({ left: 0, behavior: 'smooth' });
+  }, 120);
+}
+
 function initScratchpad() {
   const area = document.getElementById('quick-scratchpad');
   const status = document.getElementById('scratchpad-status');
+  const doneBtn = document.getElementById('scratchpad-done-btn');
   if (!area) return;
 
   area.value = localStorage.getItem('dashboard_scratchpad') || '';
   let timeoutId = null;
+
+  area.addEventListener('focus', () => {
+    if (doneBtn) doneBtn.hidden = false;
+  });
 
   area.addEventListener('input', () => {
     localStorage.setItem('dashboard_scratchpad', area.value);
@@ -949,6 +965,19 @@ function initScratchpad() {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => status.classList.remove('visible'), 1800);
     }
+  });
+
+  area.addEventListener('blur', () => {
+    setTimeout(() => {
+      if (doneBtn) doneBtn.hidden = true;
+      resetMobileViewportZoom();
+    }, 80);
+  });
+
+  doneBtn?.addEventListener('click', () => {
+    area.blur();
+    resetMobileViewportZoom();
+    showToast('Memo gespeichert ✓');
   });
 }
 

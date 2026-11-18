@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "date": "2026-11-18",
-  "notes": "Kompaktes Filter-Popover im Header (0px Platzverbrauch im Board, alle 7 Apps einzeln per Haken schaltbar)"
+  "notes": "Memo-Zoom auf iPhone setzt sich nach dem Speichern / Tippen auf 'Fertig ✓' automatisch auf 100% Normalgröße zurück"
 }
