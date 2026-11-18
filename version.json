@@ -1,5 +1,5 @@
 {
-  "version": "1.6.1",
+  "version": "1.6.2",
   "date": "2026-11-18",
-  "notes": "Automatische Strava-Rückkehr direkt ins Board-Cockpit & synchrone Sitzungs-Injektion"
+  "notes": "Redundantes Schließen-X oben rechts im Cockpit entfernt (Steuerung sauber über '‹ Board' oben links)"
 }
