@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.4.3';
+const APP_VERSION = '1.4.4';
 const APP_BUILD_DATE = '18.11.2026';
 
 const APPS = [

@@ -1,5 +1,5 @@
 {
-  "version": "1.4.3",
+  "version": "1.4.4",
   "date": "2026-11-18",
-  "notes": "Obere Suchleiste und ⌘K-Befehlspalette komplett entfernt"
+  "notes": "Standortfreigabe (Geolocation), Mikrofon & App-Deeplinks (Waze/Karten) im Split-Cockpit aktiviert"
 }
