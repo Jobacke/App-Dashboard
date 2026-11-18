@@ -991,7 +991,7 @@ function initIosInstallModal() {
   const urlCode = document.getElementById('ios-live-url');
 
   const liveUrl = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-    ? 'https://jobacke.github.io/App-Dashboard/'
+    ? 'https://board.vjbackhaus.de/'
     : location.href.split('#')[0];
 
   if (urlCode) urlCode.textContent = liveUrl;
