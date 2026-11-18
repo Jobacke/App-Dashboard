@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.6.3';
+const APP_VERSION = '1.6.4';
 const APP_BUILD_DATE = '18.11.2026';
 
 const APPS = [
@@ -887,8 +887,26 @@ function openCockpit(appId, customUrl = null) {
 
   if (loader) loader.hidden = false;
   if (iframe) {
+    let pendingGeoCoords = null;
+    if (app.id === 'znanavi' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (p) => {
+          pendingGeoCoords = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() };
+          try {
+            iframe.contentWindow?.postMessage({ type: 'board-geolocation-result', ok: true, coords: pendingGeoCoords }, '*');
+          } catch {}
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      );
+    }
     iframe.onload = () => {
       if (loader) loader.hidden = true;
+      if (pendingGeoCoords) {
+        try {
+          iframe.contentWindow?.postMessage({ type: 'board-geolocation-result', ok: true, coords: pendingGeoCoords }, '*');
+        } catch {}
+      }
     };
     iframe.src = finalUrl;
   }
@@ -957,6 +975,36 @@ function initCockpitControls() {
           e.source.postMessage({ type: 'board-storage-value', key: e.data.key, value: val }, '*');
         }
       } catch {}
+    } else if (e.data.type === 'board-get-geolocation') {
+      const reqId = e.data.reqId || '';
+      const targetWin = e.source || document.getElementById('cockpit-iframe')?.contentWindow;
+      if (!navigator.geolocation) {
+        try { targetWin?.postMessage({ type: 'board-geolocation-result', reqId, ok: false, code: 2 }, '*'); } catch {}
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (p) => {
+          try {
+            targetWin?.postMessage({
+              type: 'board-geolocation-result',
+              reqId,
+              ok: true,
+              coords: { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() }
+            }, '*');
+          } catch {}
+        },
+        (err) => {
+          try {
+            targetWin?.postMessage({
+              type: 'board-geolocation-result',
+              reqId,
+              ok: false,
+              code: err ? err.code : 1
+            }, '*');
+          } catch {}
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      );
     }
   });
 }
