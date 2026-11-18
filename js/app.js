@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.4.2';
+const APP_VERSION = '1.4.3';
 const APP_BUILD_DATE = '18.11.2026';
 
 const APPS = [
@@ -242,14 +242,12 @@ function reorderAppBefore(sourceId, targetId) {
    Initialization
    ========================================================================== */
 document.addEventListener('DOMContentLoaded', () => {
-  initPlatformKeys();
   initClock();
   initLaunchModeControl();
   initThemeToggle();
   initScratchpad();
   initFilterPopover();
   initCockpitControls();
-  initCommandPalette();
   initGlobalShortcuts();
   initLivePingButton();
   initVersionDisplayAndUpdateCheck();
@@ -257,14 +255,6 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAll();
   registerServiceWorker();
 });
-
-function initPlatformKeys() {
-  const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform);
-  const modKeyEl = document.getElementById('mod-key');
-  if (modKeyEl && !isMac) {
-    modKeyEl.textContent = 'Ctrl+';
-  }
-}
 
 /* ==========================================================================
    Live Clock & Calendar Week (KW)
@@ -1012,195 +1002,14 @@ function initLivePingButton() {
 }
 
 /* ==========================================================================
-   Command Palette (Cmd+K / Ctrl+K)
-   ========================================================================== */
-function initCommandPalette() {
-  const trigger = document.getElementById('cmd-trigger');
-  const modal = document.getElementById('cmd-modal');
-  const input = document.getElementById('cmd-input');
-
-  trigger?.addEventListener('click', openCommandPalette);
-
-  modal?.addEventListener('click', (e) => {
-    if (e.target === modal) closeCommandPalette();
-  });
-
-  input?.addEventListener('input', () => {
-    state.cmdSelectedIndex = 0;
-    renderCommandResults(input.value);
-  });
-
-  input?.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      if (state.cmdItems.length > 0) {
-        state.cmdSelectedIndex = (state.cmdSelectedIndex + 1) % state.cmdItems.length;
-        highlightCommandItem();
-      }
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (state.cmdItems.length > 0) {
-        state.cmdSelectedIndex = (state.cmdSelectedIndex - 1 + state.cmdItems.length) % state.cmdItems.length;
-        highlightCommandItem();
-      }
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      const item = state.cmdItems[state.cmdSelectedIndex];
-      if (item) {
-        executeCommandItem(item, e.shiftKey);
-      }
-    } else if (e.key === 'Escape') {
-      closeCommandPalette();
-    }
-  });
-}
-
-function openCommandPalette() {
-  const modal = document.getElementById('cmd-modal');
-  const input = document.getElementById('cmd-input');
-  if (!modal || !input) return;
-
-  modal.hidden = false;
-  input.value = '';
-  state.cmdSelectedIndex = 0;
-  renderCommandResults('');
-  setTimeout(() => input.focus(), 10);
-}
-
-function closeCommandPalette() {
-  const modal = document.getElementById('cmd-modal');
-  if (modal) modal.hidden = true;
-}
-
-function renderCommandResults(query) {
-  const container = document.getElementById('cmd-results');
-  if (!container) return;
-
-  const q = query.trim().toLowerCase();
-  const items = [];
-  const ordered = getOrderedApps();
-
-  ordered.forEach((app) => {
-    const matchText = `${app.title} ${app.domain} ${app.categoryLabel} ${app.keywords}`.toLowerCase();
-    if (!q || matchText.includes(q)) {
-      items.push({
-        type: 'app',
-        appId: app.id,
-        title: app.title,
-        subtitle: `${app.categoryLabel} · ${app.domain}`,
-        icon: app.icon,
-        shortcut: app.key,
-        url: app.url
-      });
-    }
-  });
-
-  const extraCommands = [
-    {
-      type: 'custom',
-      appId: 'analytics',
-      title: 'KICKR Headwind Vollbild-Cockpit starten',
-      subtitle: 'Analytics · Direktlink zur Lüftersteuerung',
-      icon: 'icons/analytics.png',
-      shortcut: 'HW',
-      url: 'https://analytics.vjbackhaus.de/?headwind=1'
-    },
-    {
-      type: 'theme',
-      title: 'Erscheinungsbild umschalten (Dark / Light Mode)',
-      subtitle: 'Board Design anpassen',
-      icon: 'icons/dashboard.svg',
-      shortcut: 'T'
-    }
-  ];
-
-  extraCommands.forEach((cmd) => {
-    if (!q || cmd.title.toLowerCase().includes(q) || cmd.subtitle.toLowerCase().includes(q)) {
-      items.push(cmd);
-    }
-  });
-
-  if (q.length >= 2) {
-    items.push({
-      type: 'custom',
-      appId: 'wissen',
-      title: `In Wissen RD nach „${query.trim()}“ suchen`,
-      subtitle: 'wissen.vjbackhaus.de · Sofort-Nachschlagen',
-      icon: 'icons/wissen.png',
-      shortcut: '↵',
-      url: `https://wissen.vjbackhaus.de/?q=${encodeURIComponent(query.trim())}`
-    });
-  }
-
-  state.cmdItems = items;
-
-  container.innerHTML = items.map((item, idx) => `
-    <div class="cmd-item ${idx === state.cmdSelectedIndex ? 'selected' : ''}" data-cmd-idx="${idx}">
-      <div class="cmd-item-left">
-        <img src="${item.icon}" alt="" class="cmd-item-icon" />
-        <div>
-          <div class="cmd-item-title">${escapeHtml(item.title)}</div>
-          <div class="cmd-item-sub">${escapeHtml(item.subtitle)}</div>
-        </div>
-      </div>
-      <div class="cmd-item-right">
-        <kbd>${escapeHtml(item.shortcut || '↵')}</kbd>
-      </div>
-    </div>
-  `).join('');
-
-  container.querySelectorAll('[data-cmd-idx]').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      const idx = Number(el.dataset.cmdIdx);
-      executeCommandItem(state.cmdItems[idx], e.shiftKey);
-    });
-  });
-}
-
-function highlightCommandItem() {
-  const container = document.getElementById('cmd-results');
-  if (!container) return;
-  container.querySelectorAll('.cmd-item').forEach((el, idx) => {
-    const active = idx === state.cmdSelectedIndex;
-    el.classList.toggle('selected', active);
-    if (active) el.scrollIntoView({ block: 'nearest' });
-  });
-}
-
-function executeCommandItem(item, forceCockpit = false) {
-  closeCommandPalette();
-  if (item.type === 'theme') {
-    document.getElementById('theme-toggle')?.click();
-    return;
-  }
-  triggerAppLaunch(item.appId, item.url, forceCockpit ? 'cockpit' : null);
-}
-
-/* ==========================================================================
-   Global Keyboard Shortcuts (Cmd+K, 1-7, Esc)
+   Global Keyboard Shortcuts (1-7, Esc)
    ========================================================================== */
 function initGlobalShortcuts() {
   document.addEventListener('keydown', (e) => {
     const activeTag = document.activeElement?.tagName.toLowerCase();
     const isTyping = activeTag === 'input' || activeTag === 'textarea' || document.activeElement?.isContentEditable;
 
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-      e.preventDefault();
-      const modal = document.getElementById('cmd-modal');
-      if (modal && !modal.hidden) {
-        closeCommandPalette();
-      } else {
-        openCommandPalette();
-      }
-      return;
-    }
-
     if (e.key === 'Escape') {
-      const modal = document.getElementById('cmd-modal');
-      if (modal && !modal.hidden) {
-        closeCommandPalette();
-        return;
-      }
       if (state.activeCockpitAppId) {
         closeCockpit();
         return;
