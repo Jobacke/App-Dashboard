@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.6.1';
 const APP_BUILD_DATE = '18.11.2026';
 
 const APPS = [
@@ -254,6 +254,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   renderAll();
   registerServiceWorker();
+
+  /* Falls Strava OAuth ans Board zurückkehrt (#strava_auth=...), Token im Board-Tresor sichern und sofort Analytics im Board-Cockpit öffnen! */
+  try {
+    if (window.location.hash && window.location.hash.includes('strava_auth=')) {
+      const m = window.location.hash.match(/strava_auth=([^&]+)/);
+      if (m && m[1]) {
+        const rawJson = decodeURIComponent(escape(atob(decodeURIComponent(m[1]))));
+        localStorage.setItem('board_vault_strava_pulse_auth', rawJson);
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        setTimeout(() => {
+          openCockpit('analytics');
+          showToast('Strava erfolgreich mit Analytics im Board verbunden!');
+        }, 120);
+      }
+    }
+  } catch (e) {
+    console.warn('Strava Handoff Fehler:', e);
+  }
 });
 
 /* ==========================================================================
@@ -825,12 +843,26 @@ function openCockpit(appId, customUrl = null) {
   const loader = document.getElementById('cockpit-loader');
   const switcher = document.getElementById('cockpit-switcher');
 
-  const finalUrl = customUrl || app.url;
+  let finalUrl = customUrl || app.url;
+  try {
+    if (app.id === 'analytics' && !finalUrl.includes('board_strava=')) {
+      const stravaRaw = localStorage.getItem('board_vault_strava_pulse_auth');
+      if (stravaRaw) {
+        const b64 = btoa(unescape(encodeURIComponent(stravaRaw)));
+        finalUrl += (finalUrl.includes('#') ? '&' : '#') + 'board_strava=' + encodeURIComponent(b64);
+      }
+    } else if (app.id === 'gesundheit' && !finalUrl.includes('board_gc_auth=')) {
+      const gcRaw = localStorage.getItem('board_vault_gc_auto_auth_v1');
+      if (gcRaw) {
+        finalUrl += (finalUrl.includes('#') ? '&' : '#') + 'board_gc_auth=' + encodeURIComponent(gcRaw);
+      }
+    }
+  } catch (e) {}
 
   if (iconEl) iconEl.src = app.icon;
   if (titleEl) titleEl.textContent = app.title;
-  if (urlEl) urlEl.textContent = finalUrl;
-  if (extLink) extLink.href = finalUrl;
+  if (urlEl) urlEl.textContent = customUrl || app.url;
+  if (extLink) extLink.href = customUrl || app.url;
 
   if (switcher) {
     const ordered = getOrderedApps();

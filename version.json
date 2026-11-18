@@ -1,5 +1,5 @@
 {
-  "version": "1.6.0",
+  "version": "1.6.1",
   "date": "2026-11-18",
-  "notes": "Dauerhafte Sitzungs-Brücke für Gesundheit & Analytics im Cockpit sowie Top-Level Strava-OAuth"
+  "notes": "Automatische Strava-Rückkehr direkt ins Board-Cockpit & synchrone Sitzungs-Injektion"
 }
