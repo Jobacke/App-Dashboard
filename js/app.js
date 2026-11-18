@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 const APP_BUILD_DATE = '18.11.2026';
 
 const APPS = [
@@ -248,7 +248,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initThemeToggle();
   initScratchpad();
   initFilterPopover();
-  initWorkflows();
   initCockpitControls();
   initCommandPalette();
   initGlobalShortcuts();
@@ -978,31 +977,6 @@ function initScratchpad() {
     area.blur();
     resetMobileViewportZoom();
     showToast('Memo gespeichert ✓');
-  });
-}
-
-/* ==========================================================================
-   Multi-App Workflows
-   ========================================================================== */
-function initWorkflows() {
-  document.querySelectorAll('[data-workflow]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const wf = btn.dataset.workflow;
-      if (wf === 'shift-start') {
-        showToast('Öffne Rettungsdienst-Paket: Schichttagebuch & Wissen…');
-        openCockpit('wissen');
-        window.open('https://schicht.vjbackhaus.de/', '_blank', 'noopener');
-      } else if (wf === 'training-cockpit') {
-        showToast('Starte Analytics & Gesundheitscockpit…');
-        openCockpit('gesundheit');
-        window.open('https://analytics.vjbackhaus.de/', '_blank', 'noopener');
-      } else if (wf === 'headwind-direct') {
-        triggerAppLaunch('analytics', 'https://analytics.vjbackhaus.de/?headwind=1', 'tab');
-      } else if (wf === 'tour-prep') {
-        openCockpit('notizen');
-        window.open('https://tagebuch.vjbackhaus.de/', '_blank', 'noopener');
-      }
-    });
   });
 }
 

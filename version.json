@@ -1,5 +1,5 @@
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "date": "2026-11-18",
-  "notes": "Memo-Zoom auf iPhone setzt sich nach dem Speichern / Tippen auf 'Fertig ✓' automatisch auf 100% Normalgröße zurück"
+  "notes": "Multi-App-Workflows-Block entfernt"
 }
