@@ -1174,17 +1174,16 @@ html[data-theme="light"] .quick-chip {
   left: 50%;
   transform: translateX(-50%);
   z-index: 45;
-  width: max-content;
-  max-width: calc(100vw - 16px);
+  width: min(440px, calc(100vw - 16px));
 }
 
 .dock-inner {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 48px));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   align-items: center;
-  justify-content: center;
-  gap: clamp(5px, 1.5vw, 10px);
-  padding: clamp(6px, 1.4vw, 9px) clamp(8px, 2vw, 14px);
+  justify-items: center;
+  gap: 8px;
+  padding: 8px 12px;
   border-radius: 22px;
   background: var(--bg-glass-strong);
   backdrop-filter: blur(28px) saturate(190%);
@@ -1195,9 +1194,10 @@ html[data-theme="light"] .quick-chip {
 
 .dock-item {
   position: relative;
-  width: clamp(36px, 10.6vw, 48px);
-  height: clamp(36px, 10.6vw, 48px);
-  border-radius: clamp(10px, 2.6vw, 13px);
+  width: 100%;
+  max-width: 48px;
+  aspect-ratio: 1 / 1;
+  border-radius: 26%;
   border: none;
   background: transparent;
   padding: 0;
@@ -1210,6 +1210,7 @@ html[data-theme="light"] .quick-chip {
   height: 100%;
   border-radius: inherit;
   object-fit: cover;
+  display: block;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.14);
 }
