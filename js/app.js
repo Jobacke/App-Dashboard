@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.9.5';
+const APP_VERSION = '1.9.6';
 const APP_BUILD_DATE = '19.11.2026';
 
 const APPS = [
@@ -1280,13 +1280,24 @@ function initScratchpad() {
     openCockpit('notizen');
   });
 
+  function autoResizeMemoField() {
+    area.style.height = 'auto';
+    if (!area.value.trim()) {
+      area.style.height = '';
+      return;
+    }
+    area.style.height = `${Math.min(area.scrollHeight, 160)}px`;
+  }
+
   area.value = localStorage.getItem('dashboard_scratchpad') || '';
+  autoResizeMemoField();
   let timeoutId = null;
 
   function persistMemo() {
     localStorage.setItem('dashboard_scratchpad', area.value);
     updateTransferButtonState();
-    if (status) {
+    autoResizeMemoField();
+    if (status && !isRecording) {
       status.classList.add('visible');
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => status.classList.remove('visible'), 1800);
@@ -1389,6 +1400,7 @@ function initScratchpad() {
   function setMicRecordingUI(active) {
     micBtn?.classList.toggle('recording', active);
     area.classList.toggle('mic-listening', active);
+    if (openNotizenBtn) openNotizenBtn.hidden = active;
     if (status) {
       if (active) {
         status.textContent = '● Hört zu…';
@@ -1453,6 +1465,7 @@ function initScratchpad() {
     area.value = value;
     localStorage.setItem('dashboard_scratchpad', area.value);
     updateTransferButtonState();
+    autoResizeMemoField();
     area.scrollTop = area.scrollHeight;
   }
 
@@ -1511,7 +1524,7 @@ function initScratchpad() {
 
     let lastResultEventTime = Date.now();
 
-    /* Injects "; " into cumulative iOS/Safari single-segment transcripts when the user pauses > 550ms between terms */
+    /* Injects "; " into cumulative iOS/Safari single-segment transcripts only after a clear pause (> 1150ms) between terms */
     const applyPauseSplittingToSegment = (segObj, rawTranscript, now) => {
       const trimmedRaw = rawTranscript.trim();
       if (!trimmedRaw) return '';
@@ -1532,7 +1545,7 @@ function initScratchpad() {
         if (addedPart) {
           const pauseDuration = now - lastResultEventTime;
           const baseWithPauses = (segObj.withPauses || prevRaw).replace(/[;,]+\s*$/, '').trim();
-          segObj.withPauses = pauseDuration > 550
+          segObj.withPauses = pauseDuration > 1150
             ? `${baseWithPauses}; ${addedPart}`
             : `${baseWithPauses} ${addedPart}`;
           segObj.rawHistory = trimmedRaw;
@@ -1579,7 +1592,7 @@ function initScratchpad() {
 
       const rawInterimCombined = currentInterimParts.join('; ').trim();
       const processedInterim = rawInterimCombined
-        ? formatMemoSpeechText(rawInterimCombined).replace(/[;,]+\s*$/, '').trim() + '; '
+        ? formatMemoSpeechText(rawInterimCombined).replace(/[;,]+\s*$/, '').trim()
         : '';
 
       const cleanInterim = processedInterim.replace(/[;,]+\s*$/, '').trim();
@@ -1695,6 +1708,7 @@ function initScratchpad() {
 
   area.addEventListener('focus', () => {
     if (doneBtn) doneBtn.hidden = false;
+    if (openNotizenBtn && window.innerWidth <= 500) openNotizenBtn.hidden = true;
   });
 
   area.addEventListener('input', persistMemo);
@@ -1702,6 +1716,8 @@ function initScratchpad() {
   area.addEventListener('blur', () => {
     setTimeout(() => {
       if (doneBtn) doneBtn.hidden = true;
+      if (openNotizenBtn && !isRecording) openNotizenBtn.hidden = false;
+      autoResizeMemoField();
       resetMobileViewportZoom();
     }, 80);
   });
@@ -1733,6 +1749,7 @@ function initScratchpad() {
       btn.innerHTML = origHtml;
       if (res && res.ok) {
         area.value = '';
+        autoResizeMemoField();
         localStorage.removeItem('dashboard_scratchpad');
         area.blur();
         resetMobileViewportZoom();

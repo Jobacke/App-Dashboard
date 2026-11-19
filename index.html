@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Board" />
-  <link rel="manifest" href="manifest.webmanifest?v=24" />
+  <link rel="manifest" href="manifest.webmanifest?v=25" />
   <link rel="icon" type="image/svg+xml" href="icons/dashboard.svg" />
   <link rel="alternate icon" type="image/png" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2" />
@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=24" />
+  <link rel="stylesheet" href="css/style.css?v=25" />
   <script>
     try {
       const savedTheme = localStorage.getItem('dashboard_theme') || 'dark';
@@ -47,7 +47,7 @@
         <div class="brand-text">
           <div class="brand-title-row">
             <span class="brand-title">Board</span>
-            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v1.9.5</span>
+            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v1.9.6</span>
           </div>
           <span class="brand-subtitle">vjbackhaus.de Ecosystem</span>
         </div>
@@ -142,16 +142,14 @@
         </div>
       </div>
 
-      <!-- 2. Darunter das Memofenster -->
+      <!-- 2. Darunter das kompakte Memofenster -->
       <div class="scratchpad-card glass-panel" id="scratchpad-card">
         <div class="scratchpad-header">
-          <div class="scratchpad-title-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="scratchpad-icon"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-            <span>Schnell-Memo</span>
-          </div>
-          <div class="scratchpad-actions">
-            <span class="scratchpad-saved" id="scratchpad-status">Gespeichert</span>
-            <button type="button" class="scratchpad-mic-btn" id="scratchpad-mic-btn" title="Schnell-Memo per Sprache diktieren" aria-label="Schnell-Memo per Sprache diktieren">
+          <div class="scratchpad-left-controls">
+            <span class="scratchpad-title-wrap" title="Kurznotiz" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="scratchpad-icon"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </span>
+            <button type="button" class="scratchpad-mic-btn" id="scratchpad-mic-btn" title="Kurznotiz per Sprache diktieren" aria-label="Kurznotiz per Sprache diktieren">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
@@ -159,25 +157,25 @@
                 <line x1="8" y1="23" x2="16" y2="23"/>
               </svg>
             </button>
+            <div class="memo-transfer-btns">
+              <button type="button" class="memo-cat-btn cat-dringend" data-memo-cat="Dringend" title="In Rubrik 'Dringend' speichern & Feld leeren">
+                <span class="memo-cat-dot"></span> dringend
+              </button>
+              <button type="button" class="memo-cat-btn cat-juh" data-memo-cat="JUH" title="In Rubrik 'JUH' speichern & Feld leeren">
+                <span class="memo-cat-dot"></span> JUH
+              </button>
+              <button type="button" class="memo-cat-btn cat-privat" data-memo-cat="Privat" title="In Rubrik 'Privat' speichern & Feld leeren">
+                <span class="memo-cat-dot"></span> privat
+              </button>
+            </div>
+          </div>
+          <div class="scratchpad-actions">
+            <span class="scratchpad-saved" id="scratchpad-status">Gespeichert</span>
             <button type="button" class="scratchpad-save-btn" id="scratchpad-done-btn" hidden>Fertig ✓</button>
             <button type="button" id="scratchpad-open-notizen" class="scratchpad-link" title="Notizen-App direkt im Board öffnen">→ Notizen</button>
           </div>
         </div>
-        <textarea id="quick-scratchpad" class="scratchpad-input" rows="2" placeholder="Kurze Gedanken, Schicht-Notiz oder To-Do direkt hier festhalten…"></textarea>
-        <div class="memo-transfer-bar" id="memo-transfer-bar">
-          <span class="memo-transfer-label">Übertragen in Notizen:</span>
-          <div class="memo-transfer-btns">
-            <button type="button" class="memo-cat-btn cat-dringend" data-memo-cat="Dringend" title="Schnell-Memo in Rubrik 'Dringend' speichern & Feld leeren">
-              <span class="memo-cat-dot"></span> dringend
-            </button>
-            <button type="button" class="memo-cat-btn cat-juh" data-memo-cat="JUH" title="Schnell-Memo in Rubrik 'JUH' speichern & Feld leeren">
-              <span class="memo-cat-dot"></span> JUH
-            </button>
-            <button type="button" class="memo-cat-btn cat-privat" data-memo-cat="Privat" title="Schnell-Memo in Rubrik 'Privat' speichern & Feld leeren">
-              <span class="memo-cat-dot"></span> privat
-            </button>
-          </div>
-        </div>
+        <textarea id="quick-scratchpad" class="scratchpad-input" rows="1" placeholder="Kurznotiz hier eintragen"></textarea>
       </div>
     </section>
 
@@ -190,7 +188,7 @@
 
     <!-- App Footer with Version & Build Info -->
     <footer class="dashboard-footer">
-      <span>Board · <strong id="footer-version">v1.9.5</strong></span>
+      <span>Board · <strong id="footer-version">v1.9.6</strong></span>
       <span>·</span>
       <span id="footer-date">Stand 19.11.2026</span>
       <span>·</span>
@@ -263,6 +261,6 @@
   <!-- Toast Notification -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
-  <script src="js/app.js?v=24"></script>
+  <script src="js/app.js?v=25"></script>
 </body>
 </html>
