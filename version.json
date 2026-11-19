@@ -1,5 +1,5 @@
 {
-  "version": "1.9.7",
+  "version": "1.9.8",
   "date": "2026-11-19",
-  "notes": "Link umbenannt in '→ Remembers' + stabiles Mehrfach-Diktat direkt hintereinander auf dem iPhone"
+  "notes": "Nahtloser iOS-Speech-Reset nach jedem Diktat (wie in Remembers) für beliebig viele Diktate hintereinander"
 }

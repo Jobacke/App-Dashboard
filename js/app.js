@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.9.7';
+const APP_VERSION = '1.9.8';
 const APP_BUILD_DATE = '19.11.2026';
 
 const APPS = [
@@ -1324,10 +1324,12 @@ function initScratchpad() {
     if (!document.hidden) pingNotizen();
   });
 
-  /* Champions-League Microphone Dictation (Clean Back-to-Back iOS SFSpeechRecognizer Engine) */
+  /* Champions-League Microphone Dictation (iOS Seamless Session Reset — 1:1 Proven from Remembers App) */
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   let activeRecognition = null;
   let isRecording = false;
+  let usedMicThisSession = false;
   let micRestartTimer = null;
   let micStartRetryTimer = null;
   let micStartRetries = 0;
@@ -1336,6 +1338,35 @@ function initScratchpad() {
   let sessionSegments = [];
   let sessionFinalText = '';
   let sessionInterimText = '';
+
+  /* Restore scroll & toast seamlessly after an iOS SFSpeechRecognizer reset reload */
+  try {
+    const savedScrollY = sessionStorage.getItem('board_scroll_y');
+    if (savedScrollY !== null) {
+      sessionStorage.removeItem('board_scroll_y');
+      requestAnimationFrame(() => window.scrollTo(0, parseInt(savedScrollY, 10) || 0));
+    }
+    const savedToast = sessionStorage.getItem('board_pending_toast');
+    if (savedToast) {
+      sessionStorage.removeItem('board_pending_toast');
+      setTimeout(() => showToast(savedToast), 120);
+    }
+  } catch {}
+
+  function triggerBoardSeamlessReload(toastMessage = '') {
+    try {
+      sessionStorage.setItem('board_scroll_y', String(window.scrollY || 0));
+      if (toastMessage) {
+        sessionStorage.setItem('board_pending_toast', toastMessage);
+      }
+    } catch {}
+    /* Always persist current field state before reload */
+    try {
+      if (area.value) localStorage.setItem('dashboard_scratchpad', area.value);
+      else localStorage.removeItem('dashboard_scratchpad');
+    } catch {}
+    window.location.reload();
+  }
 
   const MEMO_NUMBER_WORDS_DE = {
     ein: '1', eine: '1', einen: '1', eins: '1',
@@ -1701,6 +1732,11 @@ function initScratchpad() {
   micBtn?.addEventListener('click', () => {
     if (isRecording) {
       stopMic();
+      if (isIOS) {
+        /* iOS WebKit permanently wedges SFSpeechRecognizer after 1 session per document -> seamless SW-cached reload resets it cleanly so a 2nd/3rd dictation works every time! */
+        triggerBoardSeamlessReload('Aufnahme beendet ✓');
+        return;
+      }
       showToast('Aufnahme beendet ✓');
       return;
     }
@@ -1734,18 +1770,11 @@ function initScratchpad() {
     sessionSegments = [];
     micStartRetries = 0;
     isRecording = true;
+    usedMicThisSession = true;
     setMicRecordingUI(true);
     showToast('🎤 Sprich jetzt… (erneut tippen zum Stoppen)');
 
-    /* If a previous dictation ended < 350ms ago, wait briefly so iOS finishes tearing down SFSpeechRecognizer, otherwise start synchronously inside the tap gesture */
-    const msSinceLastStop = Date.now() - lastMicStopTime;
-    if (lastMicStopTime > 0 && msSinceLastStop < 350) {
-      micRestartTimer = setTimeout(() => {
-        if (isRecording) startFreshMemoRecognitionSession();
-      }, 360 - msSinceLastStop);
-    } else {
-      startFreshMemoRecognitionSession();
-    }
+    startFreshMemoRecognitionSession();
   });
 
   area.addEventListener('focus', () => {
@@ -1774,11 +1803,12 @@ function initScratchpad() {
   /* Silent transfer into Notizen app (dringend / JUH / privat) + clear scratchpad */
   transferBtns.forEach((btn) => {
     btn.addEventListener('click', async () => {
+      const hadUsedMic = isRecording || usedMicThisSession;
       stopMic();
       const memoText = area.value.trim();
       const cat = btn.dataset.memoCat;
       if (!memoText) {
-        showToast('Bitte zuerst eine Schnell-Memo eingeben');
+        showToast('Bitte zuerst eine Kurznotiz eingeben');
         return;
       }
 
@@ -1803,9 +1833,14 @@ function initScratchpad() {
         try { localStorage.setItem('dashboard_notizen_has_notes', 'true'); } catch {}
         renderAppsGrid();
         const label = res.categoryLabel || cat;
-        showToast(res.appended
+        const msg = res.appended
           ? `An bestehende ${label}-Notiz angehängt ✓`
-          : `In Notizen (${label}) übertragen ✓`);
+          : `In Remembers (${label}) übertragen ✓`;
+        if (isIOS && hadUsedMic) {
+          triggerBoardSeamlessReload(msg);
+          return;
+        }
+        showToast(msg);
       } else {
         showToast(`Fehler beim Übertragen: ${res?.error || 'Bitte kurz warten & erneut tippen'}`);
       }
