@@ -2,8 +2,8 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.6.4';
-const APP_BUILD_DATE = '18.11.2026';
+const APP_VERSION = '1.7.0';
+const APP_BUILD_DATE = '19.11.2026';
 
 const APPS = [
   {
@@ -373,6 +373,8 @@ function renderAppsGrid() {
     const isFirst = orderIdx === 0;
     const isLast = orderIdx === state.appOrder.length - 1;
 
+    const usageText = opensCount > 0 ? `${opensCount}× genutzt` : 'Bereit';
+
     return `
       <article class="app-card ${wideClass}"
                draggable="true"
@@ -387,9 +389,9 @@ function renderAppsGrid() {
             <div class="app-title-group">
               <span class="app-category-tag">${escapeHtml(app.categoryLabel)}</span>
               <h2 class="app-title">${escapeHtml(app.title)}</h2>
-              <span class="app-domain">
+              <span class="app-usage-line">
                 <span class="domain-status-dot" data-status-dot="${app.id}"></span>
-                ${escapeHtml(app.domain)}
+                <span>${usageText}</span>
               </span>
             </div>
           </div>
@@ -412,20 +414,19 @@ function renderAppsGrid() {
                       aria-label="Nach hinten verschieben">▶</button>
             </div>
             <span class="shortcut-badge" title="Tastatur-Direktwahl: Taste ${app.key}">${app.key}</span>
-            <button type="button"
-                    class="card-action-btn"
-                    data-action="cockpit"
-                    data-app-id="${app.id}"
-                    title="Im Split-Cockpit öffnen"
-                    aria-label="Im Split-Cockpit öffnen">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>
+            <a href="${app.url}"
+               target="_blank"
+               rel="noopener"
+               class="launch-cta-red"
+               data-launch-btn="${app.id}"
+               title="${escapeHtml(app.title)} starten">
+              <span>App</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/>
               </svg>
-            </button>
+            </a>
           </div>
         </div>
-
-        <p class="app-description">${escapeHtml(app.description)}</p>
 
         ${app.hasInlineSearch ? `
           <form class="card-inline-Prompt" data-wissen-form="${app.id}">
@@ -445,23 +446,6 @@ function renderAppsGrid() {
               ${escapeHtml(qa.label)}
             </a>
           `).join('')}
-        </div>
-
-        <div class="card-footer">
-          <div class="card-telemetry">
-            <span>${escapeHtml(app.telemetry)}</span>
-            ${opensCount > 0 ? `<span>· ${opensCount}× genutzt</span>` : ''}
-          </div>
-          <a href="${app.url}"
-             target="_blank"
-             rel="noopener"
-             class="launch-cta"
-             data-launch-btn="${app.id}">
-            <span>App starten</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/>
-            </svg>
-          </a>
         </div>
       </article>
     `;

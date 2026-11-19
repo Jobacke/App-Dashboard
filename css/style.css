@@ -912,7 +912,8 @@ html[data-theme="light"] .icon-sun { display: none; }
 .bento-grid {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
-  gap: 18px;
+  gap: 16px;
+  align-items: start;
 }
 
 /* Responsive Spans for the 7 Apps in a 12-Column Bento Layout */
@@ -925,11 +926,11 @@ html[data-theme="light"] .icon-sun { display: none; }
   -webkit-backdrop-filter: blur(22px) saturate(160%);
   border: 1px solid var(--border-subtle);
   box-shadow: var(--card-shadow);
-  padding: 22px;
+  padding: 15px 17px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 16px;
+  gap: 11px;
   overflow: hidden;
   transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.26s ease, box-shadow 0.26s ease, background 0.26s ease;
   cursor: pointer;
@@ -994,24 +995,26 @@ html[data-theme="light"] .icon-sun { display: none; }
 /* Card Header */
 .card-top {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 10px;
 }
 
 .app-identity {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
 }
 
 .app-icon-box {
   position: relative;
-  width: 62px;
-  height: 62px;
-  border-radius: 16px;
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
   flex-shrink: 0;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.12);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.12);
   overflow: hidden;
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -1030,31 +1033,39 @@ html[data-theme="light"] .icon-sun { display: none; }
 .app-title-group {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 1px;
+  min-width: 0;
 }
 
 .app-category-tag {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--app-accent, #ff2a5c);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .app-title {
   font-family: var(--font-display);
-  font-size: 1.28rem;
+  font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: -0.015em;
-  line-height: 1.2;
+  line-height: 1.18;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+.app-usage-line,
 .app-domain {
   font-family: var(--font-mono);
-  font-size: 0.73rem;
+  font-size: 0.71rem;
   color: var(--text-muted);
   display: flex;
   align-items: center;
@@ -1258,6 +1269,36 @@ html[data-theme="light"] .quick-chip {
   gap: 8px;
 }
 
+.launch-cta-red {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #ff2a5c 0%, #dc143c 100%);
+  border: 1px solid rgba(255, 110, 140, 0.45);
+  color: #ffffff;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(255, 42, 92, 0.38);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+}
+
+.launch-cta-red:hover {
+  transform: translateY(-1px) scale(1.03);
+  filter: brightness(1.08);
+  box-shadow: 0 6px 16px rgba(255, 42, 92, 0.52);
+}
+
+.launch-cta-red:active {
+  transform: scale(0.96);
+}
+
 .launch-cta {
   display: inline-flex;
   align-items: center;
@@ -1273,16 +1314,10 @@ html[data-theme="light"] .quick-chip {
   transition: all 0.2s ease;
 }
 
-.app-card:hover .launch-cta {
-  background: var(--app-accent, #ff2a5c);
+.launch-cta:hover {
+  background: var(--accent-primary);
   color: #ffffff;
   border-color: transparent;
-  box-shadow: 0 4px 14px var(--app-glow, rgba(255, 42, 92, 0.35));
-}
-
-/* Ensure dark text on bright gold/yellow accents when hovered */
-.app-card[data-contrast="dark"]:hover .launch-cta {
-  color: #0b0d13;
 }
 
 /* ==========================================================================
@@ -2030,7 +2065,11 @@ html[data-theme="light"] .cmd-item:hover {
   }
   .app-card, .app-card.bento-wide {
     grid-column: span 12;
-    padding: 16px;
+    padding: 12px 14px;
+    gap: 9px;
+  }
+  .bento-grid {
+    gap: 10px;
   }
   .card-top {
     gap: 8px;
@@ -2038,14 +2077,28 @@ html[data-theme="light"] .cmd-item:hover {
   .app-identity {
     min-width: 0;
     flex: 1;
-    gap: 12px;
+    gap: 10px;
   }
   .app-icon-box {
-    width: 52px;
-    height: 52px;
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+  }
+  .app-category-tag {
+    font-size: 0.6rem;
   }
   .app-title {
-    font-size: 1.15rem;
+    font-size: 0.98rem;
+  }
+  .move-btn {
+    width: 22px;
+    height: 24px;
+    font-size: 0.65rem;
+  }
+  .launch-cta-red {
+    height: 28px;
+    padding: 0 9px;
+    font-size: 0.72rem;
   }
   .card-meta-actions {
     flex-shrink: 0;

@@ -1,5 +1,5 @@
 {
-  "version": "1.6.4",
-  "date": "2026-11-18",
-  "notes": "Redundantes Schließen-X oben rechts im Cockpit entfernt (Steuerung sauber über '‹ Board' oben links)"
+  "version": "1.7.0",
+  "date": "2026-11-19",
+  "notes": "Schlanke Smart-Action Cards (Variante 3): Beschreibungstext & Footer entfernt, roter 'App ↗'-Button direkt oben rechts, nur noch Nutzungszähler"
 }
