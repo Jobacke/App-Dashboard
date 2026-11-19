@@ -613,15 +613,19 @@ html[data-theme="light"] .icon-sun { display: none; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   font-size: 0.8rem;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .scratchpad-title-wrap {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   color: var(--accent-gold);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .scratchpad-icon {
@@ -654,6 +658,8 @@ html[data-theme="light"] .icon-sun { display: none; }
   color: #0b0d13;
   font-size: 0.74rem;
   font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
   cursor: pointer;
   transition: transform 0.15s ease;
 }
@@ -670,6 +676,8 @@ html[data-theme="light"] .icon-sun { display: none; }
   color: var(--text-secondary);
   text-decoration: none;
   font-size: 0.76rem;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: color 0.15s;
 }
 
@@ -697,6 +705,112 @@ html[data-theme="light"] .icon-sun { display: none; }
   border-color: rgba(245, 184, 46, 0.65);
   min-height: 112px;
   font-size: 1rem;
+}
+
+/* Quick-Memo Transfer Bar (dringend / JUH / privat) */
+.memo-transfer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.memo-transfer-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.memo-transfer-btns {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.memo-cat-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 29px;
+  padding: 0 11px;
+  border-radius: 9px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.16s ease, border-color 0.16s ease, opacity 0.16s ease;
+}
+
+html[data-theme="light"] .memo-cat-btn {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.memo-cat-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.memo-cat-btn.cat-dringend .memo-cat-dot { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+.memo-cat-btn.cat-juh .memo-cat-dot { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+.memo-cat-btn.cat-privat .memo-cat-dot { background: #10b981; box-shadow: 0 0 6px #10b981; }
+
+.memo-cat-btn.cat-dringend:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.55);
+  transform: translateY(-1px);
+}
+.memo-cat-btn.cat-juh:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.55);
+  transform: translateY(-1px);
+}
+.memo-cat-btn.cat-privat:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.55);
+  transform: translateY(-1px);
+}
+
+.memo-cat-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Notizen vorhanden Badge inside the Notizen card */
+.notes-present-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(234, 179, 8, 0.16);
+  border: 1px solid rgba(234, 179, 8, 0.42);
+  color: #facc15;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+html[data-theme="light"] .notes-present-badge {
+  background: rgba(234, 179, 8, 0.18);
+  color: #a16207;
+  border-color: rgba(202, 138, 4, 0.45);
+}
+
+.notes-present-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #eab308;
+  box-shadow: 0 0 6px #eab308;
 }
 
 /* Compact Filter Popover in Header (0px space in board) */

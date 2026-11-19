@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.8.0';
 const APP_BUILD_DATE = '19.11.2026';
 
 const APPS = [
@@ -191,6 +191,7 @@ const state = {
   draggedAppId: null,
   usageCounts: JSON.parse(localStorage.getItem('dashboard_usage') || '{}'),
   lastOpened: JSON.parse(localStorage.getItem('dashboard_last_opened') || 'null'),
+  notizenHasNotes: localStorage.getItem('dashboard_notizen_has_notes') === 'true',
   activeCockpitAppId: null,
   cmdSelectedIndex: 0,
   cmdItems: []
@@ -374,6 +375,7 @@ function renderAppsGrid() {
     const isLast = orderIdx === state.appOrder.length - 1;
 
     const usageText = opensCount > 0 ? `${opensCount}× genutzt` : 'Bereit';
+    const showNotesBadge = app.id === 'notizen' && state.notizenHasNotes;
 
     return `
       <article class="app-card ${wideClass}"
@@ -392,6 +394,7 @@ function renderAppsGrid() {
               <span class="app-usage-line">
                 <span class="domain-status-dot" data-status-dot="${app.id}"></span>
                 <span>${usageText}</span>
+                ${showNotesBadge ? '<span class="notes-present-badge"><span class="notes-present-dot"></span>Notizen vorhanden</span>' : ''}
               </span>
             </div>
           </div>
@@ -989,6 +992,24 @@ function initCockpitControls() {
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
       );
+    } else if (e.data.type === 'notizen-status') {
+      const hasNotes = Boolean(e.data.hasNotes);
+      if (state.notizenHasNotes !== hasNotes) {
+        state.notizenHasNotes = hasNotes;
+        try { localStorage.setItem('dashboard_notizen_has_notes', hasNotes ? 'true' : 'false'); } catch {}
+        renderAppsGrid();
+      }
+    } else if (e.data.type === 'notizen-add-result') {
+      const cb = pendingNotizenCallbacks.get(e.data.reqId);
+      if (cb) {
+        pendingNotizenCallbacks.delete(e.data.reqId);
+        cb(e.data);
+      }
+      if (typeof e.data.hasNotes === 'boolean') {
+        state.notizenHasNotes = e.data.hasNotes;
+        try { localStorage.setItem('dashboard_notizen_has_notes', e.data.hasNotes ? 'true' : 'false'); } catch {}
+        renderAppsGrid();
+      }
     }
   });
 }
@@ -1035,14 +1056,73 @@ function resetMobileViewportZoom() {
   }, 120);
 }
 
+const pendingNotizenCallbacks = new Map();
+
+function getNotizenBridgeWindow() {
+  const bridge = document.getElementById('notizen-bridge-iframe');
+  return bridge ? bridge.contentWindow : null;
+}
+
+function sendMemoToNotizenApp(text, categoryName) {
+  return new Promise((resolve) => {
+    const win = getNotizenBridgeWindow();
+    if (!win) {
+      resolve({ ok: false, error: 'Notizen-Verbindung nicht bereit' });
+      return;
+    }
+    const reqId = `memo_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const timer = setTimeout(() => {
+      if (pendingNotizenCallbacks.has(reqId)) {
+        pendingNotizenCallbacks.delete(reqId);
+        resolve({ ok: false, error: 'Zeitüberschreitung beim Übertragen' });
+      }
+    }, 8000);
+
+    pendingNotizenCallbacks.set(reqId, (res) => {
+      clearTimeout(timer);
+      resolve(res);
+    });
+
+    try {
+      win.postMessage({ type: 'board-add-text-note', reqId, text, category: categoryName }, '*');
+    } catch (err) {
+      clearTimeout(timer);
+      pendingNotizenCallbacks.delete(reqId);
+      resolve({ ok: false, error: 'Übertragung blockiert' });
+    }
+  });
+}
+
 function initScratchpad() {
   const area = document.getElementById('quick-scratchpad');
   const status = document.getElementById('scratchpad-status');
   const doneBtn = document.getElementById('scratchpad-done-btn');
+  const transferBtns = document.querySelectorAll('[data-memo-cat]');
+  const bridgeFrame = document.getElementById('notizen-bridge-iframe');
   if (!area) return;
 
   area.value = localStorage.getItem('dashboard_scratchpad') || '';
   let timeoutId = null;
+
+  function updateTransferButtonState() {
+    const hasText = area.value.trim().length > 0;
+    transferBtns.forEach((btn) => {
+      btn.disabled = !hasText;
+    });
+  }
+  updateTransferButtonState();
+
+  /* Ping background Notizen bridge once loaded and whenever returning to foreground */
+  const pingNotizen = () => {
+    try { getNotizenBridgeWindow()?.postMessage({ type: 'board-notizen-ping' }, '*'); } catch {}
+  };
+  bridgeFrame?.addEventListener('load', () => {
+    pingNotizen();
+    setTimeout(pingNotizen, 1200);
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) pingNotizen();
+  });
 
   area.addEventListener('focus', () => {
     if (doneBtn) doneBtn.hidden = false;
@@ -1050,6 +1130,7 @@ function initScratchpad() {
 
   area.addEventListener('input', () => {
     localStorage.setItem('dashboard_scratchpad', area.value);
+    updateTransferButtonState();
     if (status) {
       status.classList.add('visible');
       clearTimeout(timeoutId);
@@ -1068,6 +1149,39 @@ function initScratchpad() {
     area.blur();
     resetMobileViewportZoom();
     showToast('Memo gespeichert ✓');
+  });
+
+  /* Silent transfer into Notizen app (dringend / JUH / privat) + clear scratchpad */
+  transferBtns.forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const memoText = area.value.trim();
+      const cat = btn.dataset.memoCat;
+      if (!memoText) {
+        showToast('Bitte zuerst eine Schnell-Memo eingeben');
+        return;
+      }
+
+      transferBtns.forEach((b) => { b.disabled = true; });
+      const origHtml = btn.innerHTML;
+      btn.textContent = 'Sende…';
+
+      const res = await sendMemoToNotizenApp(memoText, cat);
+
+      btn.innerHTML = origHtml;
+      if (res && res.ok) {
+        area.value = '';
+        localStorage.removeItem('dashboard_scratchpad');
+        area.blur();
+        resetMobileViewportZoom();
+        state.notizenHasNotes = true;
+        try { localStorage.setItem('dashboard_notizen_has_notes', 'true'); } catch {}
+        renderAppsGrid();
+        showToast(`In Notizen (${res.categoryLabel || cat}) übertragen ✓`);
+      } else {
+        showToast(`Fehler beim Übertragen: ${res?.error || 'Bitte kurz warten & erneut tippen'}`);
+      }
+      updateTransferButtonState();
+    });
   });
 }
 

@@ -1,5 +1,5 @@
 {
-  "version": "1.7.0",
+  "version": "1.8.0",
   "date": "2026-11-19",
-  "notes": "Schlanke Smart-Action Cards (Variante 3): Beschreibungstext & Footer entfernt, roter 'App ↗'-Button direkt oben rechts, nur noch Nutzungszähler"
+  "notes": "Schnell-Memo still in Notizen-App übertragen (dringend / JUH / privat) + 'Notizen vorhanden'-Hinweis auf der Notizen-Kachel"
 }
