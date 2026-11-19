@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.9.10';
+const APP_VERSION = '2.0.0';
 const APP_BUILD_DATE = '19.11.2026';
 
 const APPS = [
@@ -1304,10 +1304,12 @@ function initScratchpad() {
     }
   }
 
+  let isRecording = false;
+
   function updateTransferButtonState() {
     const hasText = area.value.trim().length > 0;
     transferBtns.forEach((btn) => {
-      btn.disabled = !hasText;
+      btn.disabled = !(hasText || isRecording);
     });
   }
   updateTransferButtonState();
@@ -1324,47 +1326,124 @@ function initScratchpad() {
     if (!document.hidden) pingNotizen();
   });
 
-  /* Champions-League Microphone Dictation (Exact Proven v1.9.6 / Remembers Recipe:
-     Top-level sync SpeechRecognition + getUserMedia + rec.stop() [NEVER abort()!] + 250ms iOS Seamless Session Reset) */
-  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  let activeRecognition = null;
+  /* Champions-League iOS-Proof Microphone Engine:
+     Pure MediaRecorder + Groq Whisper Large v3 Turbo (~0.4s latency, works unlimited times in a row on iOS Home-Screen PWA,
+     zero Apple webkitSpeechRecognition lockups, studio-grade German RD & RTW noise suppression!) */
+  const GROQ_KEY_STORAGE = 'board_groq_api_key';
+  const groqBackdrop = document.getElementById('groq-modal-backdrop');
+  const groqInput = document.getElementById('groq-api-key-input');
+  const groqStatusEl = document.getElementById('groq-modal-status');
+  const groqSaveBtn = document.getElementById('groq-save-btn');
+  const groqDeleteBtn = document.getElementById('groq-delete-btn');
+  const groqCancelBtn = document.getElementById('groq-cancel-btn');
+  const groqCloseBtn = document.getElementById('groq-modal-close');
+  const groqEyeBtn = document.getElementById('groq-toggle-visibility');
+  const openGroqSettingsBtn = document.getElementById('open-groq-settings-btn');
+  const groqStatusPill = document.getElementById('groq-status-pill');
+
+  let mediaRecorder = null;
   let micMediaStream = null;
-  let isRecording = false;
-  let usedMicThisSession = false;
-  let micRestartTimer = null;
-  let sessionTranscriptBase = '';
-  let sessionSegments = [];
-  let sessionFinalText = '';
-  let sessionInterimText = '';
+  let audioChunks = [];
+  let isTranscribing = false;
+  let recordTimerInterval = null;
+  let recordStartTime = 0;
 
-  /* Restore scroll & toast seamlessly after an iOS audio/speech session reset */
-  try {
-    const savedScrollY = sessionStorage.getItem('board_scroll_y');
-    if (savedScrollY !== null) {
-      sessionStorage.removeItem('board_scroll_y');
-      requestAnimationFrame(() => window.scrollTo(0, parseInt(savedScrollY, 10) || 0));
-    }
-    const savedToast = sessionStorage.getItem('board_pending_toast');
-    if (savedToast) {
-      sessionStorage.removeItem('board_pending_toast');
-      setTimeout(() => showToast(savedToast), 120);
-    }
-  } catch {}
-
-  function triggerBoardSeamlessReload(toastMessage = '', delayMs = 250) {
-    try {
-      sessionStorage.setItem('board_scroll_y', String(window.scrollY || 0));
-      if (toastMessage) {
-        sessionStorage.setItem('board_pending_toast', toastMessage);
-      }
-      if (area.value) localStorage.setItem('dashboard_scratchpad', area.value);
-      else localStorage.removeItem('dashboard_scratchpad');
-    } catch {}
-    setTimeout(() => {
-      window.location.reload();
-    }, delayMs);
+  function getGroqKey() {
+    try { return (localStorage.getItem(GROQ_KEY_STORAGE) || '').trim(); } catch { return ''; }
   }
+
+  function updateGroqStatusPill() {
+    const hasKey = Boolean(getGroqKey());
+    if (groqStatusPill) {
+      groqStatusPill.textContent = hasKey ? '● Aktiv' : 'Einrichten';
+      groqStatusPill.classList.toggle('active', hasKey);
+    }
+  }
+  updateGroqStatusPill();
+
+  function openGroqModal() {
+    const filterPopover = document.getElementById('filter-popover');
+    if (filterPopover) filterPopover.hidden = true;
+    const currentKey = getGroqKey();
+    if (groqInput) {
+      groqInput.value = currentKey;
+      groqInput.type = 'password';
+    }
+    if (groqDeleteBtn) groqDeleteBtn.hidden = !currentKey;
+    if (groqStatusEl) {
+      groqStatusEl.textContent = currentKey ? '✓ Groq-Key ist hinterlegt und aktiv.' : '';
+      groqStatusEl.className = currentKey ? 'groq-modal-status ok' : 'groq-modal-status';
+    }
+    if (groqBackdrop) groqBackdrop.hidden = false;
+    setTimeout(() => groqInput?.focus(), 60);
+  }
+
+  function closeGroqModal() {
+    if (groqBackdrop) groqBackdrop.hidden = true;
+    resetMobileViewportZoom();
+  }
+
+  openGroqSettingsBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openGroqModal();
+  });
+  groqCancelBtn?.addEventListener('click', closeGroqModal);
+  groqCloseBtn?.addEventListener('click', closeGroqModal);
+  groqBackdrop?.addEventListener('click', (e) => {
+    if (e.target === groqBackdrop) closeGroqModal();
+  });
+  groqEyeBtn?.addEventListener('click', () => {
+    if (!groqInput) return;
+    groqInput.type = groqInput.type === 'password' ? 'text' : 'password';
+  });
+  groqDeleteBtn?.addEventListener('click', () => {
+    try { localStorage.removeItem(GROQ_KEY_STORAGE); } catch {}
+    updateGroqStatusPill();
+    closeGroqModal();
+    showToast('Groq-Key entfernt');
+  });
+  groqSaveBtn?.addEventListener('click', async () => {
+    const key = (groqInput?.value || '').trim();
+    if (!key) {
+      if (groqStatusEl) {
+        groqStatusEl.textContent = 'Bitte zuerst deinen Groq-API-Key (gsk_…) einfügen.';
+        groqStatusEl.className = 'groq-modal-status err';
+      }
+      return;
+    }
+    groqSaveBtn.disabled = true;
+    groqSaveBtn.textContent = 'Prüfe…';
+    if (groqStatusEl) {
+      groqStatusEl.textContent = 'Teste Verbindung zu Groq Whisper…';
+      groqStatusEl.className = 'groq-modal-status';
+    }
+    try {
+      const resp = await fetch('https://api.groq.com/openai/v1/models', {
+        headers: { Authorization: `Bearer ${key}` }
+      });
+      if (!resp.ok) {
+        throw new Error(resp.status === 401 ? 'Ungültiger API-Key (bitte prüfen)' : `HTTP ${resp.status}`);
+      }
+      localStorage.setItem(GROQ_KEY_STORAGE, key);
+      updateGroqStatusPill();
+      if (groqStatusEl) {
+        groqStatusEl.textContent = '✅ Verbindung erfolgreich – Whisper v3 Turbo bereit!';
+        groqStatusEl.className = 'groq-modal-status ok';
+      }
+      setTimeout(() => {
+        closeGroqModal();
+        showToast('🎤 Groq Whisper aktiv – jetzt aufs Mikrofon tippen!');
+      }, 450);
+    } catch (err) {
+      if (groqStatusEl) {
+        groqStatusEl.textContent = `❌ ${err?.message || 'Verbindung fehlgeschlagen'}`;
+        groqStatusEl.className = 'groq-modal-status err';
+      }
+    } finally {
+      groqSaveBtn.disabled = false;
+      groqSaveBtn.textContent = 'Testen & Speichern';
+    }
+  });
 
   const MEMO_NUMBER_WORDS_DE = {
     ein: '1', eine: '1', einen: '1', eins: '1',
@@ -1384,11 +1463,15 @@ function initScratchpad() {
 
   function formatMemoSpeechText(rawText) {
     if (!rawText) return '';
-    let text = String(rawText);
+    let text = String(rawText).trim();
 
     text = text.replace(/\b(?:neue\s+)?zeile\b/gi, '\n');
     text = text.replace(/\b(?:neuer\s+)?absatz\b/gi, '\n\n');
     text = text.replace(/\b(?:semikolon|strichpunkt)\b/gi, '; ');
+
+    /* Convert Whisper pause punctuation (non-decimal commas & sentence periods, protecting Z.n./V.a./0,9%) into "; " */
+    text = text.replace(/(?<!\d),(?!\d)\s*/g, '; ');
+    text = text.replace(/(?<!\b(?:z|v|n|a|b|stk|st|nr|ca|dr|inkl|ggf|evtl|bzw|u|s|o|d))\.(?=\s|$)/gi, ';');
 
     const UNIT_LOOKAHEAD = '(?:cm|mm|m|km|ml|l|dl|cl|mg|g|kg|µg|mcg|ug|ie|i\\.e\\.|iu|ch|charri[eè]re|gauge|zoll|uhr|min|sek|std|h|grad|prozent|%|bar|mmhg|mmol|liter|milliliter|gramm|milligramm|mikrogramm|zentimeter|millimeter|meter|er|te|ten|ter)\\b';
 
@@ -1422,298 +1505,245 @@ function initScratchpad() {
     text = text.replace(/[ \t]*;[ \t]*/g, '; ');
     text = text.replace(/(?:;\s*){2,}/g, '; ');
     text = text.replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n');
+    text = text.replace(/^[;,\s]+/, '').replace(/[;,\s]+$/, '').trim();
     return text;
   }
 
-  function setMicRecordingUI(active) {
-    micBtn?.classList.toggle('recording', active);
-    area.classList.toggle('mic-listening', active);
-    if (openNotizenBtn) openNotizenBtn.hidden = active;
+  function setMicUIState(mode, labelText = '') {
+    micBtn?.classList.toggle('recording', mode === 'recording');
+    area.classList.toggle('mic-listening', mode === 'recording');
+    if (openNotizenBtn) openNotizenBtn.hidden = (mode === 'recording' || mode === 'transcribing');
+    updateTransferButtonState();
     if (status) {
-      if (active) {
-        status.textContent = '● Hört zu…';
+      status.classList.remove('recording', 'transcribing');
+      if (mode === 'recording') {
+        status.textContent = labelText || '● 0:00';
         status.classList.add('visible', 'recording');
+      } else if (mode === 'transcribing') {
+        status.textContent = labelText || '✨ Erkenne…';
+        status.classList.add('visible', 'transcribing');
       } else {
         status.textContent = 'Gespeichert';
-        status.classList.remove('recording');
       }
-    }
-  }
-
-  function rebuildMemoFromSession() {
-    let combined = (sessionTranscriptBase || '').trim();
-    for (let idx = 0; idx < sessionSegments.length; idx++) {
-      const seg = sessionSegments[idx];
-      if (!seg || !seg.text) continue;
-      let segText = seg.text.trim();
-      const prevSeg = idx > 0 ? sessionSegments[idx - 1] : null;
-      if (prevSeg && prevSeg.text) {
-        const prevText = prevSeg.text.trim();
-        if (segText.toLowerCase() === prevText.toLowerCase()) continue;
-        if (segText.toLowerCase().startsWith(prevText.toLowerCase())) {
-          segText = segText.slice(prevText.length).replace(/^[;,\s]+/, '').trim();
-          if (!segText) continue;
-        }
-      }
-      segText = segText.replace(/[;,]+\s*$/, '').trim();
-      if (!segText) continue;
-
-      if (combined === '') {
-        combined = segText;
-      } else if (segText.startsWith('\n') || combined.endsWith('\n')) {
-        combined += segText;
-      } else {
-        combined = combined.replace(/[;,]+\s*$/, '') + '; ' + segText;
-      }
-    }
-    if (combined && !combined.endsWith('\n')) {
-      combined = combined.replace(/[;,]+\s*$/, '') + '; ';
-    }
-    sessionFinalText = combined;
-  }
-
-  function syncMemoFieldFromSpeech() {
-    const finalPart = sessionFinalText || '';
-    const interimPart = sessionInterimText || '';
-    let value = finalPart;
-    if (interimPart) {
-      if (!value) {
-        value = interimPart;
-      } else if (value.endsWith('\n') || value.endsWith('; ') || value.endsWith(' ')) {
-        value += interimPart;
-      } else {
-        value = value.replace(/[;,]+\s*$/, '') + '; ' + interimPart;
-      }
-    }
-    area.value = value;
-    localStorage.setItem('dashboard_scratchpad', area.value);
-    updateTransferButtonState();
-    autoResizeMemoField();
-    area.scrollTop = area.scrollHeight;
-  }
-
-  function flushInterimToFinal() {
-    if (sessionInterimText && sessionInterimText.trim()) {
-      const flushed = formatMemoSpeechText(sessionInterimText.trim()).replace(/[;,]+\s*$/, '').trim();
-      const cleanFinal = sessionFinalText.replace(/[;,]+\s*$/, '').trim();
-      if (flushed && !cleanFinal.toLowerCase().endsWith(flushed.toLowerCase())) {
-        const prefix = (sessionFinalText === '' || sessionFinalText.endsWith('\n') || sessionFinalText.endsWith('; ')) ? '' : '; ';
-        sessionFinalText += prefix + flushed + '; ';
-      }
-      sessionInterimText = '';
     }
   }
 
   function releaseMicStream() {
+    clearInterval(recordTimerInterval);
+    recordTimerInterval = null;
     if (micMediaStream) {
       try { micMediaStream.getTracks().forEach((t) => t.stop()); } catch {}
       micMediaStream = null;
     }
   }
 
-  function stopMic() {
-    clearTimeout(micRestartTimer);
-    micRestartTimer = null;
-    if (!isRecording && !activeRecognition && !micMediaStream) return;
-    isRecording = false;
-    setMicRecordingUI(false);
+  async function transcribeAudioWithGroq(audioBlob) {
+    const apiKey = getGroqKey();
+    if (!apiKey) return { ok: false, error: 'Kein Groq-API-Key hinterlegt' };
+    if (!audioBlob || audioBlob.size < 400) return { ok: false, error: 'Aufnahme zu kurz' };
 
-    flushInterimToFinal();
+    const mime = (audioBlob.type || 'audio/mp4').split(';')[0];
+    const ext = mime.includes('mp4') || mime.includes('m4a') ? 'm4a'
+      : mime.includes('ogg') ? 'ogg'
+      : mime.includes('wav') ? 'wav'
+      : 'webm';
 
-    if (activeRecognition) {
-      const rec = activeRecognition;
-      activeRecognition = null;
-      try {
-        rec.onresult = null;
-        rec.onend = null;
-        rec.onerror = null;
-        /* CRITICAL FOR iOS (proven in Remembers): Always use rec.stop(), NEVER rec.abort()! */
-        rec.stop();
-      } catch {}
+    const formData = new FormData();
+    formData.append('file', audioBlob, `memo.${ext}`);
+    formData.append('model', 'whisper-large-v3-turbo');
+    formData.append('language', 'de');
+    formData.append('response_format', 'verbose_json');
+    formData.append('temperature', '0');
+    formData.append(
+      'prompt',
+      'Rettungsdienst, JUH, Materialauffüllung, Notizen: Viggo, Viggos, Jonosteril, NaCl 0,9%, Ringer, Mullbinde, Mullbinden, 8 cm Mullbinde, Kompressen 10x10, Decke, Decken, Laken, EKG-Elektroden, Verbandpäckchen, Handschuhe, Pflaster, Spritze, Kanüle, RTW, NEF, KTW, ZNA. Begriffe mit Semikolon trennen: 2 x Decken; 3 x Laken; 8 cm Mullbinde;'
+    );
+
+    const resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: formData
+    });
+
+    if (!resp.ok) {
+      if (resp.status === 401) {
+        return { ok: false, error: 'Groq-Key ungültig – bitte in den Einstellungen prüfen' };
+      }
+      return { ok: false, error: `Groq-Fehler (${resp.status})` };
     }
 
-    releaseMicStream();
+    const data = await resp.json();
+    const HALLUCINATION_RE = /^(?:untertitel|vielen dank fürs zuschauen|vielen dank für ihre aufmerksamkeit|amara\.org|tschüss\.?|danke\.?)$/i;
 
-    if (sessionFinalText) {
-      syncMemoFieldFromSpeech();
-      persistMemo();
+    let rawCombined = '';
+    if (Array.isArray(data.segments) && data.segments.length > 0) {
+      const cleanSegs = [];
+      for (const seg of data.segments) {
+        const segText = String(seg.text || '').trim();
+        if (!segText) continue;
+        if (typeof seg.no_speech_prob === 'number' && seg.no_speech_prob > 0.85 && segText.length < 40) continue;
+        if (HALLUCINATION_RE.test(segText.replace(/[.!?]+$/, '').trim())) continue;
+        cleanSegs.push(segText);
+      }
+      rawCombined = cleanSegs.join('; ');
+    } else {
+      rawCombined = String(data.text || '').trim();
     }
+
+    const formatted = formatMemoSpeechText(rawCombined);
+    if (!formatted || HALLUCINATION_RE.test(formatted)) {
+      return { ok: false, error: 'Keine Sprache erkannt – bitte näher ins Mikrofon sprechen' };
+    }
+    return { ok: true, text: formatted };
   }
 
-  function startFreshMemoRecognitionSession() {
-    clearTimeout(micRestartTimer);
-    if (!isRecording || !SpeechRec) return;
-
-    const rec = new SpeechRec();
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.lang = 'de-DE';
-    activeRecognition = rec;
-
-    let lastResultEventTime = Date.now();
-
-    const applyPauseSplittingToSegment = (segObj, rawTranscript, now) => {
-      const trimmedRaw = rawTranscript.trim();
-      if (!trimmedRaw) return '';
-      if (!segObj.rawHistory) {
-        segObj.rawHistory = trimmedRaw;
-        segObj.withPauses = trimmedRaw;
-        return trimmedRaw;
+  function stopAndTranscribeRecording() {
+    return new Promise((resolve) => {
+      if (!isRecording || !mediaRecorder) {
+        releaseMicStream();
+        isRecording = false;
+        setMicUIState('idle');
+        resolve({ ok: false, skipped: true });
+        return;
       }
-      const prevRaw = segObj.rawHistory;
-      if (trimmedRaw.toLowerCase() === prevRaw.toLowerCase()) {
-        return segObj.withPauses || trimmedRaw;
-      }
-      if (trimmedRaw.toLowerCase().startsWith(prevRaw.toLowerCase())) {
-        const addedPart = trimmedRaw.slice(prevRaw.length).trim();
-        if (addedPart) {
-          const pauseDuration = now - lastResultEventTime;
-          const baseWithPauses = (segObj.withPauses || prevRaw).replace(/[;,]+\s*$/, '').trim();
-          segObj.withPauses = pauseDuration > 1150
-            ? `${baseWithPauses}; ${addedPart}`
-            : `${baseWithPauses} ${addedPart}`;
-          segObj.rawHistory = trimmedRaw;
-          return segObj.withPauses;
+
+      isRecording = false;
+      clearInterval(recordTimerInterval);
+      recordTimerInterval = null;
+      const recorder = mediaRecorder;
+      mediaRecorder = null;
+
+      let settled = false;
+      const finish = async () => {
+        if (settled) return;
+        settled = true;
+        releaseMicStream();
+
+        const mimeType = recorder.mimeType || (audioChunks[0] && audioChunks[0].type) || 'audio/mp4';
+        const blob = new Blob(audioChunks, { type: mimeType });
+        audioChunks = [];
+
+        isTranscribing = true;
+        setMicUIState('transcribing', '✨ Erkenne…');
+
+        try {
+          const result = await transcribeAudioWithGroq(blob);
+          if (result.ok && result.text) {
+            const existing = area.value.trim();
+            const cleanNew = result.text.replace(/[;,]+\s*$/, '').trim();
+            if (existing) {
+              const prefix = existing.endsWith('\n') ? existing : existing.replace(/[;,]+\s*$/, '') + '; ';
+              area.value = `${prefix}${cleanNew}; `;
+            } else {
+              area.value = `${cleanNew}; `;
+            }
+            persistMemo();
+            area.scrollTop = area.scrollHeight;
+            showToast('🎤 Text erkannt ✓');
+            resolve({ ok: true, text: area.value });
+          } else {
+            showToast(result.error || 'Keine Sprache erkannt');
+            resolve({ ok: false, error: result.error });
+          }
+        } catch (err) {
+          console.error('Groq Whisper error:', err);
+          showToast('Transkription fehlgeschlagen (Internet prüfen)');
+          resolve({ ok: false, error: err?.message || 'Netzwerkfehler' });
+        } finally {
+          isTranscribing = false;
+          setMicUIState('idle');
         }
-      }
-      segObj.rawHistory = trimmedRaw;
-      segObj.withPauses = trimmedRaw;
-      return trimmedRaw;
-    };
+      };
 
-    rec.onresult = (event) => {
-      const now = Date.now();
-      const currentInterimParts = [];
-
-      for (let i = 0; i < event.results.length; i++) {
-        const result = event.results[i];
-        const bestTranscript = result[0].transcript;
-        const existing = sessionSegments[i] || { text: '', rawHistory: '', withPauses: '' };
-        const pausedText = applyPauseSplittingToSegment(existing, bestTranscript, now);
-
-        if (result.isFinal) {
-          sessionSegments[i] = { ...existing, text: formatMemoSpeechText(pausedText) };
+      recorder.onstop = finish;
+      try {
+        if (recorder.state !== 'inactive') {
+          recorder.stop();
         } else {
-          sessionSegments[i] = { ...existing, text: '' };
-          currentInterimParts.push(pausedText);
+          finish();
         }
+      } catch {
+        finish();
       }
-
-      lastResultEventTime = now;
-      rebuildMemoFromSession();
-
-      const rawInterimCombined = currentInterimParts.join('; ').trim();
-      const processedInterim = rawInterimCombined
-        ? formatMemoSpeechText(rawInterimCombined).replace(/[;,]+\s*$/, '').trim()
-        : '';
-
-      const cleanInterim = processedInterim.replace(/[;,]+\s*$/, '').trim();
-      const cleanFinal = sessionFinalText.replace(/[;,]+\s*$/, '').trim();
-      if (cleanInterim && cleanFinal.toLowerCase().endsWith(cleanInterim.toLowerCase())) {
-        sessionInterimText = '';
-      } else {
-        sessionInterimText = processedInterim;
-      }
-
-      syncMemoFieldFromSpeech();
-    };
-
-    rec.onerror = (event) => {
-      const errCode = event?.error || '';
-      if (errCode === 'no-speech' || errCode === 'aborted') return;
-      console.warn('Memo speech recognition warning:', errCode);
-      if (errCode === 'not-allowed' || errCode === 'service-not-allowed') {
-        stopMic();
-        showToast('Mikrofonzugriff bitte erlauben (Safari/iOS Einstellungen)');
-      }
-    };
-
-    rec.onend = () => {
-      if (activeRecognition !== rec) return;
-      activeRecognition = null;
-      if (isRecording) {
-        flushInterimToFinal();
-        sessionTranscriptBase = sessionFinalText;
-        sessionSegments = [];
-        syncMemoFieldFromSpeech();
-        micRestartTimer = setTimeout(() => {
-          if (isRecording) startFreshMemoRecognitionSession();
-        }, 100);
-      }
-    };
-
-    try {
-      rec.start();
-    } catch (e) {
-      console.warn('Could not start SpeechRecognition synchronously:', e);
-    }
+      /* Safety fallback in case iOS delays onstop */
+      setTimeout(finish, 700);
+    });
   }
 
   micBtn?.addEventListener('click', async () => {
+    if (isTranscribing) return;
+
     if (isRecording) {
-      stopMic();
-      if (isIOS && navigator.onLine) {
-        /* Exact Remembers pattern: after rec.stop() + track release, wait 250ms then seamless reload so iOS resets AVAudioSession & SFSpeechRecognizer cleanly! */
-        triggerBoardSeamlessReload('Aufnahme beendet ✓', 250);
-        return;
-      }
-      showToast('Aufnahme beendet ✓');
+      await stopAndTranscribeRecording();
       return;
     }
 
-    if (!SpeechRec) {
+    if (!getGroqKey()) {
+      openGroqModal();
+      return;
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
       area.focus();
-      showToast('Spracherkennung in diesem Browser nicht verfügbar – bitte Tastatur-Mikrofon nutzen');
+      showToast('Audio-Aufnahme in diesem Browser nicht verfügbar');
       return;
     }
 
     try { area.blur(); } catch {}
 
-    if (activeRecognition) {
-      try {
-        activeRecognition.onresult = null;
-        activeRecognition.onend = null;
-        activeRecognition.onerror = null;
-        activeRecognition.stop();
-      } catch {}
-      activeRecognition = null;
-    }
-
-    const existing = area.value.trim();
-    sessionTranscriptBase = existing ? (existing.endsWith('\n') ? existing : existing.replace(/[;,]+\s*$/, '') + '; ') : '';
-    sessionFinalText = sessionTranscriptBase;
-    sessionInterimText = '';
-    sessionSegments = [];
-    isRecording = true;
-    usedMicThisSession = true;
-    setMicRecordingUI(true);
-    showToast('🎤 Sprich jetzt… (erneut tippen zum Stoppen)');
-
-    /* 1:1 proven v1.9.6 & Remembers pattern:
-       1) Synchronous SpeechRecognition.start() inside user tap BEFORE any await! */
-    startFreshMemoRecognitionSession();
-
-    /* 2) Activate iOS AVAudioSession & mic stream via getUserMedia (NO AudioContext on iOS!) */
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }
-        });
-        if (!isRecording) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
         }
-        micMediaStream = stream;
-      } catch (err) {
-        console.warn('Board mic getUserMedia error:', err);
-        if (err && err.name === 'NotAllowedError') {
-          stopMic();
-          showToast('Mikrofonzugriff nicht erlaubt – bitte in iOS Einstellungen erlauben');
+      });
+
+      micMediaStream = stream;
+      audioChunks = [];
+
+      const isIOSDevice = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const preferredMimes = isIOSDevice
+        ? ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm']
+        : ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+
+      let chosenMime = '';
+      for (const m of preferredMimes) {
+        if (typeof MediaRecorder.isTypeSupported === 'function' && MediaRecorder.isTypeSupported(m)) {
+          chosenMime = m;
+          break;
         }
+      }
+
+      mediaRecorder = chosenMime ? new MediaRecorder(stream, { mimeType: chosenMime }) : new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) {
+          audioChunks.push(ev.data);
+        }
+      };
+
+      mediaRecorder.start(250);
+      isRecording = true;
+      recordStartTime = Date.now();
+      setMicUIState('recording', '● 0:00');
+      showToast('🎤 Sprich jetzt… (erneut tippen zum Stoppen)');
+
+      recordTimerInterval = setInterval(() => {
+        if (!isRecording) return;
+        const sec = Math.floor((Date.now() - recordStartTime) / 1000);
+        const mins = Math.floor(sec / 60);
+        const rem = String(sec % 60).padStart(2, '0');
+        setMicUIState('recording', `● ${mins}:${rem}`);
+      }, 250);
+    } catch (err) {
+      releaseMicStream();
+      isRecording = false;
+      setMicUIState('idle');
+      if (err && err.name === 'NotAllowedError') {
+        showToast('Mikrofonzugriff bitte in den iOS Einstellungen erlauben');
+      } else {
+        showToast(`Mikrofon-Fehler: ${err?.message || 'nicht verfügbar'}`);
       }
     }
   });
@@ -1728,24 +1758,27 @@ function initScratchpad() {
   area.addEventListener('blur', () => {
     setTimeout(() => {
       if (doneBtn) doneBtn.hidden = true;
-      if (openNotizenBtn && !isRecording) openNotizenBtn.hidden = false;
+      if (openNotizenBtn && !isRecording && !isTranscribing) openNotizenBtn.hidden = false;
       autoResizeMemoField();
       resetMobileViewportZoom();
     }, 80);
   });
 
-  doneBtn?.addEventListener('click', () => {
-    stopMic();
+  doneBtn?.addEventListener('click', async () => {
+    if (isRecording) {
+      await stopAndTranscribeRecording();
+    }
     area.blur();
     resetMobileViewportZoom();
     showToast('Memo gespeichert ✓');
   });
 
-  /* Silent transfer into Notizen app (dringend / JUH / privat) + clear scratchpad */
+  /* Silent transfer into Remembers app (dringend / JUH / privat) + clear scratchpad */
   transferBtns.forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const hadUsedMic = isRecording || usedMicThisSession;
-      stopMic();
+      if (isRecording) {
+        await stopAndTranscribeRecording();
+      }
       const memoText = area.value.trim();
       const cat = btn.dataset.memoCat;
       if (!memoText) {
@@ -1762,10 +1795,6 @@ function initScratchpad() {
       btn.innerHTML = origHtml;
       if (res && res.ok) {
         area.value = '';
-        sessionTranscriptBase = '';
-        sessionFinalText = '';
-        sessionInterimText = '';
-        sessionSegments = [];
         autoResizeMemoField();
         localStorage.removeItem('dashboard_scratchpad');
         area.blur();
@@ -1774,14 +1803,9 @@ function initScratchpad() {
         try { localStorage.setItem('dashboard_notizen_has_notes', 'true'); } catch {}
         renderAppsGrid();
         const label = res.categoryLabel || cat;
-        const msg = res.appended
+        showToast(res.appended
           ? `An bestehende ${label}-Notiz angehängt ✓`
-          : `In Remembers (${label}) übertragen ✓`;
-        if (isIOS && hadUsedMic && navigator.onLine) {
-          triggerBoardSeamlessReload(msg, 120);
-          return;
-        }
-        showToast(msg);
+          : `In Remembers (${label}) übertragen ✓`);
       } else {
         showToast(`Fehler beim Übertragen: ${res?.error || 'Bitte kurz warten & erneut tippen'}`);
       }

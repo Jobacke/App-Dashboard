@@ -1,5 +1,5 @@
 {
-  "version": "1.9.10",
+  "version": "2.0.0",
   "date": "2026-11-19",
-  "notes": "Bewährte v1.9.6-Sprachengine (rec.stop + getUserMedia) + sauberer 250ms-Reset für Mehrfach-Diktate + Update-Banner-Fix"
+  "notes": "Neue iPhone-feste Sprach-Engine mit MediaRecorder + Groq Whisper Large v3 (beliebig viele Diktate direkt hintereinander)"
 }

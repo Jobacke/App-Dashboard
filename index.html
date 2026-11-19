@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Board" />
-  <link rel="manifest" href="manifest.webmanifest?v=29" />
+  <link rel="manifest" href="manifest.webmanifest?v=30" />
   <link rel="icon" type="image/svg+xml" href="icons/dashboard.svg" />
   <link rel="alternate icon" type="image/png" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2" />
@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=29" />
+  <link rel="stylesheet" href="css/style.css?v=30" />
   <script>
     try {
       const savedTheme = localStorage.getItem('dashboard_theme') || 'dark';
@@ -47,7 +47,7 @@
         <div class="brand-text">
           <div class="brand-title-row">
             <span class="brand-title">Board</span>
-            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v1.9.10</span>
+            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v2.0.0</span>
           </div>
           <span class="brand-subtitle">vjbackhaus.de Ecosystem</span>
         </div>
@@ -97,6 +97,12 @@
             </div>
             <div class="filter-popover-list" id="filter-popover-list">
               <!-- Populated dynamically with all 7 apps + checkboxes -->
+            </div>
+            <div class="filter-popover-footer">
+              <button type="button" class="filter-speech-btn" id="open-groq-settings-btn">
+                <span>🎤 Sprach-KI (Groq)</span>
+                <span class="groq-status-pill" id="groq-status-pill">Einrichten</span>
+              </button>
             </div>
           </div>
         </div>
@@ -188,7 +194,7 @@
 
     <!-- App Footer with Version & Build Info -->
     <footer class="dashboard-footer">
-      <span>Board · <strong id="footer-version">v1.9.10</strong></span>
+      <span>Board · <strong id="footer-version">v2.0.0</strong></span>
       <span>·</span>
       <span id="footer-date">Stand 19.11.2026</span>
       <span>·</span>
@@ -258,9 +264,41 @@
   <!-- Hidden background bridge iframe for silent Notizen transfer & status -->
   <iframe id="notizen-bridge-iframe" src="https://remembers.vjbackhaus.de/" title="Notizen Hintergrund-Sync" aria-hidden="true" tabindex="-1" style="position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;border:0;left:-9999px;top:-9999px;"></iframe>
 
+  <!-- Groq Whisper Speech-to-Text Setup Modal -->
+  <div class="groq-modal-backdrop" id="groq-modal-backdrop" hidden>
+    <div class="groq-modal glass-panel" role="dialog" aria-modal="true" aria-labelledby="groq-modal-title">
+      <div class="groq-modal-header">
+        <h3 id="groq-modal-title">🎤 Sprach-KI (Groq Whisper)</h3>
+        <button type="button" class="groq-modal-close" id="groq-modal-close" aria-label="Schließen">✕</button>
+      </div>
+      <p class="groq-modal-desc">
+        Für unbegrenztes, blitzschnelles Diktieren auf dem iPhone (auch im RTW &amp; beliebig oft hintereinander) nutzt das Board <strong>Groq Whisper Large v3</strong> – 100 % kostenlos, ohne Kreditkarte.
+      </p>
+      <ol class="groq-modal-steps">
+        <li>
+          <a href="https://console.groq.com/keys" target="_blank" rel="noopener" class="groq-key-link">Kostenlosen Groq-Key holen (console.groq.com) ↗</a>
+        </li>
+        <li>Mit Google/E-Mail anmelden → <strong>„Create API Key“</strong> → Key (<code>gsk_…</code>) kopieren.</li>
+        <li>Key hier einfügen (bleibt nur lokal auf deinem Gerät):</li>
+      </ol>
+      <div class="groq-input-wrap">
+        <input type="password" id="groq-api-key-input" class="groq-key-input" placeholder="gsk_…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <button type="button" class="groq-eye-btn" id="groq-toggle-visibility" title="Anzeigen / Verbergen" aria-label="Key anzeigen">👁</button>
+      </div>
+      <div class="groq-modal-status" id="groq-modal-status"></div>
+      <div class="groq-modal-actions">
+        <button type="button" class="groq-btn-danger" id="groq-delete-btn" hidden>Löschen</button>
+        <div class="groq-modal-actions-right">
+          <button type="button" class="groq-btn-secondary" id="groq-cancel-btn">Abbrechen</button>
+          <button type="button" class="groq-btn-primary" id="groq-save-btn">Testen &amp; Speichern</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
-  <script src="js/app.js?v=29"></script>
+  <script src="js/app.js?v=30"></script>
 </body>
 </html>
