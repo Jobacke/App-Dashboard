@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.9.0';
 const APP_BUILD_DATE = '19.11.2026';
 
 const APPS = [
@@ -1097,12 +1097,23 @@ function initScratchpad() {
   const area = document.getElementById('quick-scratchpad');
   const status = document.getElementById('scratchpad-status');
   const doneBtn = document.getElementById('scratchpad-done-btn');
+  const micBtn = document.getElementById('scratchpad-mic-btn');
   const transferBtns = document.querySelectorAll('[data-memo-cat]');
   const bridgeFrame = document.getElementById('notizen-bridge-iframe');
   if (!area) return;
 
   area.value = localStorage.getItem('dashboard_scratchpad') || '';
   let timeoutId = null;
+
+  function persistMemo() {
+    localStorage.setItem('dashboard_scratchpad', area.value);
+    updateTransferButtonState();
+    if (status) {
+      status.classList.add('visible');
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => status.classList.remove('visible'), 1800);
+    }
+  }
 
   function updateTransferButtonState() {
     const hasText = area.value.trim().length > 0;
@@ -1124,19 +1135,94 @@ function initScratchpad() {
     if (!document.hidden) pingNotizen();
   });
 
+  /* Champions-League Microphone Dictation (Live SpeechRecognition + iOS Standalone Fallback) */
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  let recognition = null;
+  let isRecording = false;
+  let baseTextBeforeMic = '';
+  let micStartedAt = 0;
+
+  function stopMic() {
+    isRecording = false;
+    micBtn?.classList.remove('recording');
+    if (recognition) {
+      try { recognition.stop(); } catch {}
+      recognition = null;
+    }
+  }
+
+  function focusForIosKeyboardDictation() {
+    area.focus();
+    try { area.setSelectionRange(area.value.length, area.value.length); } catch {}
+    showToast('🎤 Tippe unten rechts auf der Tastatur aufs Mikrofon zum Diktieren');
+  }
+
+  micBtn?.addEventListener('click', () => {
+    if (isRecording) {
+      stopMic();
+      showToast('Aufnahme beendet ✓');
+      return;
+    }
+    if (!SpeechRec || (isIOS && isStandalonePWA())) {
+      focusForIosKeyboardDictation();
+      return;
+    }
+    try {
+      recognition = new SpeechRec();
+      recognition.lang = 'de-DE';
+      recognition.interimResults = true;
+      recognition.continuous = !isIOS;
+      recognition.maxAlternatives = 1;
+
+      baseTextBeforeMic = area.value.trim();
+      micStartedAt = Date.now();
+      isRecording = true;
+      micBtn.classList.add('recording');
+      showToast('🎤 Ich höre zu… (erneut tippen zum Stoppen)');
+
+      recognition.onresult = (event) => {
+        let spoken = '';
+        for (let i = 0; i < event.results.length; i++) {
+          spoken += event.results[i][0].transcript;
+        }
+        spoken = spoken.trim();
+        area.value = baseTextBeforeMic ? `${baseTextBeforeMic}\n${spoken}` : spoken;
+        persistMemo();
+      };
+
+      recognition.onerror = (event) => {
+        const errCode = event?.error || '';
+        stopMic();
+        if (errCode === 'no-speech' || errCode === 'aborted') return;
+        if (isIOS) {
+          focusForIosKeyboardDictation();
+        } else {
+          showToast('Mikrofon nicht verfügbar – bitte Berechtigung prüfen');
+        }
+      };
+
+      recognition.onend = () => {
+        const elapsed = Date.now() - micStartedAt;
+        const hadNewText = area.value.trim() !== baseTextBeforeMic;
+        stopMic();
+        if (!hadNewText && elapsed < 900 && isIOS) {
+          focusForIosKeyboardDictation();
+        }
+      };
+
+      recognition.start();
+    } catch {
+      stopMic();
+      focusForIosKeyboardDictation();
+    }
+  });
+
   area.addEventListener('focus', () => {
     if (doneBtn) doneBtn.hidden = false;
   });
 
-  area.addEventListener('input', () => {
-    localStorage.setItem('dashboard_scratchpad', area.value);
-    updateTransferButtonState();
-    if (status) {
-      status.classList.add('visible');
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => status.classList.remove('visible'), 1800);
-    }
-  });
+  area.addEventListener('input', persistMemo);
 
   area.addEventListener('blur', () => {
     setTimeout(() => {
@@ -1146,6 +1232,7 @@ function initScratchpad() {
   });
 
   doneBtn?.addEventListener('click', () => {
+    stopMic();
     area.blur();
     resetMobileViewportZoom();
     showToast('Memo gespeichert ✓');
@@ -1154,6 +1241,7 @@ function initScratchpad() {
   /* Silent transfer into Notizen app (dringend / JUH / privat) + clear scratchpad */
   transferBtns.forEach((btn) => {
     btn.addEventListener('click', async () => {
+      stopMic();
       const memoText = area.value.trim();
       const cat = btn.dataset.memoCat;
       if (!memoText) {
@@ -1176,7 +1264,10 @@ function initScratchpad() {
         state.notizenHasNotes = true;
         try { localStorage.setItem('dashboard_notizen_has_notes', 'true'); } catch {}
         renderAppsGrid();
-        showToast(`In Notizen (${res.categoryLabel || cat}) übertragen ✓`);
+        const label = res.categoryLabel || cat;
+        showToast(res.appended
+          ? `An bestehende ${label}-Notiz angehängt ✓`
+          : `In Notizen (${label}) übertragen ✓`);
       } else {
         showToast(`Fehler beim Übertragen: ${res?.error || 'Bitte kurz warten & erneut tippen'}`);
       }

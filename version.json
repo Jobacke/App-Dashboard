@@ -1,5 +1,5 @@
 {
-  "version": "1.8.0",
+  "version": "1.9.0",
   "date": "2026-11-19",
-  "notes": "Schnell-Memo still in Notizen-App übertragen (dringend / JUH / privat) + 'Notizen vorhanden'-Hinweis auf der Notizen-Kachel"
+  "notes": "JUH-Schnellmemos hängen automatisch an bestehende JUH-Notiz an + Mikrofon-Button direkt in der Schnell-Memo"
 }

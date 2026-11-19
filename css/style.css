@@ -664,6 +664,45 @@ html[data-theme="light"] .icon-sun { display: none; }
   transition: transform 0.15s ease;
 }
 
+.scratchpad-mic-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 42, 92, 0.45);
+  background: rgba(255, 42, 92, 0.14);
+  color: #ff4a70;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.scratchpad-mic-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.scratchpad-mic-btn:hover {
+  background: rgba(255, 42, 92, 0.28);
+  color: #ffffff;
+  transform: scale(1.06);
+}
+
+.scratchpad-mic-btn.recording {
+  background: linear-gradient(135deg, #ff2a5c, #dc143c);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 0 0 0 rgba(255, 42, 92, 0.65);
+  animation: micPulse 1.15s ease-out infinite;
+}
+
+@keyframes micPulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 42, 92, 0.65); }
+  70% { box-shadow: 0 0 0 9px rgba(255, 42, 92, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 42, 92, 0); }
+}
+
 .scratchpad-save-btn[hidden] {
   display: none;
 }
