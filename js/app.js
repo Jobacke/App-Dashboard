@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.9.8';
+const APP_VERSION = '1.9.9';
 const APP_BUILD_DATE = '19.11.2026';
 
 const APPS = [
@@ -1269,7 +1269,7 @@ function initScratchpad() {
   const area = document.getElementById('quick-scratchpad');
   const status = document.getElementById('scratchpad-status');
   const doneBtn = document.getElementById('scratchpad-done-btn');
-  const micBtn = document.getElementById('scratchpad-mic-btn');
+  const micFrame = document.getElementById('scratchpad-mic-frame');
   const openNotizenBtn = document.getElementById('scratchpad-open-notizen');
   const transferBtns = document.querySelectorAll('[data-memo-cat]');
   const bridgeFrame = document.getElementById('notizen-bridge-iframe');
@@ -1324,115 +1324,12 @@ function initScratchpad() {
     if (!document.hidden) pingNotizen();
   });
 
-  /* Champions-League Microphone Dictation (iOS Seamless Session Reset — 1:1 Proven from Remembers App) */
-  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  let activeRecognition = null;
+  /* Champions-League Isolated Microphone Iframe Bridge (Self-recycling 28x28px same-origin iframe:
+     gives iOS a 100% fresh Document + SFSpeechRecognizer on EVERY dictation without reloading the Board!) */
   let isRecording = false;
-  let usedMicThisSession = false;
-  let micRestartTimer = null;
-  let micStartRetryTimer = null;
-  let micStartRetries = 0;
-  let lastMicStopTime = 0;
-  let sessionTranscriptBase = '';
-  let sessionSegments = [];
-  let sessionFinalText = '';
-  let sessionInterimText = '';
-
-  /* Restore scroll & toast seamlessly after an iOS SFSpeechRecognizer reset reload */
-  try {
-    const savedScrollY = sessionStorage.getItem('board_scroll_y');
-    if (savedScrollY !== null) {
-      sessionStorage.removeItem('board_scroll_y');
-      requestAnimationFrame(() => window.scrollTo(0, parseInt(savedScrollY, 10) || 0));
-    }
-    const savedToast = sessionStorage.getItem('board_pending_toast');
-    if (savedToast) {
-      sessionStorage.removeItem('board_pending_toast');
-      setTimeout(() => showToast(savedToast), 120);
-    }
-  } catch {}
-
-  function triggerBoardSeamlessReload(toastMessage = '') {
-    try {
-      sessionStorage.setItem('board_scroll_y', String(window.scrollY || 0));
-      if (toastMessage) {
-        sessionStorage.setItem('board_pending_toast', toastMessage);
-      }
-    } catch {}
-    /* Always persist current field state before reload */
-    try {
-      if (area.value) localStorage.setItem('dashboard_scratchpad', area.value);
-      else localStorage.removeItem('dashboard_scratchpad');
-    } catch {}
-    window.location.reload();
-  }
-
-  const MEMO_NUMBER_WORDS_DE = {
-    ein: '1', eine: '1', einen: '1', eins: '1',
-    zwei: '2', zwo: '2', drei: '3', vier: '4', fünf: '5',
-    sechs: '6', sieben: '7', acht: '8', neun: '9', zehn: '10',
-    elf: '11', zwölf: '12', fünfzehn: '15', zwanzig: '20'
-  };
-
-  const MEMO_RD_TERMS = {
-    'vigo': 'Viggo', 'vigos': 'Viggos', 'viggo': 'Viggo',
-    'rtw': 'RTW', 'nef': 'NEF', 'ktw': 'KTW', 'juh': 'JUH', 'rd': 'RD',
-    'ekg': 'EKG', 'elektroden': 'EKG-Elektroden', 'nacl': 'NaCl 0,9%',
-    'jonosteril': 'Jonosteril', 'ringer': 'Ringer', 'mullbinde': 'Mullbinde',
-    'mullbinden': 'Mullbinden', 'kompresse': 'Kompresse', 'kompressen': 'Kompressen',
-    'laken': 'Laken', 'decke': 'Decke', 'decken': 'Decken'
-  };
-
-  function formatMemoSpeechText(rawText) {
-    if (!rawText) return '';
-    let text = String(rawText);
-
-    /* 1. Magic voice commands matching Notizen app */
-    text = text.replace(/\b(?:neue\s+)?zeile\b/gi, '\n');
-    text = text.replace(/\b(?:neuer\s+)?absatz\b/gi, '\n\n');
-    text = text.replace(/\b(?:semikolon|strichpunkt)\b/gi, '; ');
-
-    const UNIT_LOOKAHEAD = '(?:cm|mm|m|km|ml|l|dl|cl|mg|g|kg|µg|mcg|ug|ie|i\\.e\\.|iu|ch|charri[eè]re|gauge|zoll|uhr|min|sek|std|h|grad|prozent|%|bar|mmhg|mmol|liter|milliliter|gramm|milligramm|mikrogramm|zentimeter|millimeter|meter|er|te|ten|ter)\\b';
-
-    /* 2. Number words & multipliers ("zwei mal" / "fünf Decken" -> "2 x" / "5 x Decken", keeping "8 cm Mullbinde" without x) */
-    text = text.replace(/\b(ein|eine|einen|eins|zwei|zwo|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|fünfzehn|zwanzig)[ \t]*(?:mal|[xX×*])\b/gi, (m, numWord) => {
-      const digit = MEMO_NUMBER_WORDS_DE[numWord.toLowerCase()] || numWord;
-      return `${digit} x`;
-    });
-    text = text.replace(/\b(\d+)[ \t]*(?:mal|[xX×*])\b(?=[ \t]*[A-Za-zÄÖÜäöüß])/gi, '$1 x');
-    text = text.replace(new RegExp(`\\b(ein|eine|einen|eins|zwei|zwo|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|fünfzehn|zwanzig)[ \\t]+(?=${UNIT_LOOKAHEAD})`, 'gi'), (m, numWord) => {
-      const digit = MEMO_NUMBER_WORDS_DE[numWord.toLowerCase()] || numWord;
-      return `${digit} `;
-    });
-    text = text.replace(new RegExp(`\\b(ein|eine|einen|eins|zwei|zwo|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|fünfzehn|zwanzig)[ \\t]+(?!x\\b|mal\\b|${UNIT_LOOKAHEAD})(?=[A-ZÄÖÜa-zäöüß]{2,})`, 'gi'), (m, numWord) => {
-      const digit = MEMO_NUMBER_WORDS_DE[numWord.toLowerCase()] || numWord;
-      return `${digit} x `;
-    });
-
-    /* 3. Core RD term corrections */
-    for (const [wrong, correct] of Object.entries(MEMO_RD_TERMS)) {
-      const esc = wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      text = text.replace(new RegExp(`(?<![\\wÄÖÜäöüß])${esc}(?![\\wÄÖÜäöüß])`, 'gi'), correct);
-    }
-
-    /* 4. Normalize quantities & separate consecutive quantity items with "; " */
-    text = text.replace(/\b(\d+)[ \t]*(?:(?:[xX×*]|mal)[ \t]*)+(?=[A-Za-zÄÖÜäöüß])/gi, '$1 x ');
-    text = text.replace(new RegExp(`\\b(\\d+)[ \\t]+(?!(?:[xX×*]|mal)\\b|${UNIT_LOOKAHEAD})([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]{1,})`, 'gi'), '$1 x $2');
-    text = text.replace(/\b(\d+)[ \t]*(?:[xX×*][ \t]*){2,}/g, '$1 x ');
-    text = text.replace(/\bEKG\s+EKG-Elektroden\b/gi, 'EKG-Elektroden');
-    text = text.replace(/\bNaCl(?:\s+0,9%){2,}/gi, 'NaCl 0,9%');
-    text = text.replace(new RegExp(`\\b(\\d+(?:[.,]\\d+)?)[ \\t]*(?:[xX×*]|mal)[ \\t]*(?=${UNIT_LOOKAHEAD})`, 'gi'), '$1 ');
-    text = text.replace(new RegExp(`(?<!\\bmal)([A-Za-zÄÖÜäöüß]{2,}|%)[ \\t]*(?:,|;|\\bund\\b)?[ \\t]+(?=\\d+[ \\t]*(?:x[ \\t]+[A-Za-zÄÖÜäöüß0-9]|${UNIT_LOOKAHEAD}[ \\t]+[A-Za-zÄÖÜäöüß]{2,}))`, 'gi'), '$1; ');
-
-    text = text.replace(/[ \t]*;[ \t]*/g, '; ');
-    text = text.replace(/(?:;\s*){2,}/g, '; ');
-    text = text.replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n');
-    return text;
-  }
 
   function setMicRecordingUI(active) {
-    micBtn?.classList.toggle('recording', active);
+    isRecording = active;
     area.classList.toggle('mic-listening', active);
     if (openNotizenBtn) openNotizenBtn.hidden = active;
     if (status) {
@@ -1446,336 +1343,42 @@ function initScratchpad() {
     }
   }
 
-  function rebuildMemoFromSession() {
-    let combined = (sessionTranscriptBase || '').trim();
-
-    for (let idx = 0; idx < sessionSegments.length; idx++) {
-      const seg = sessionSegments[idx];
-      if (!seg || !seg.text) continue;
-
-      let segText = seg.text.trim();
-      const prevSeg = idx > 0 ? sessionSegments[idx - 1] : null;
-      if (prevSeg && prevSeg.text) {
-        const prevText = prevSeg.text.trim();
-        if (segText.toLowerCase() === prevText.toLowerCase()) continue;
-        if (segText.toLowerCase().startsWith(prevText.toLowerCase())) {
-          segText = segText.slice(prevText.length).replace(/^[;,\s]+/, '').trim();
-          if (!segText) continue;
-        }
-      }
-
-      segText = segText.replace(/[;,]+\s*$/, '').trim();
-      if (!segText) continue;
-
-      if (combined === '') {
-        combined = segText;
-      } else if (segText.startsWith('\n') || combined.endsWith('\n')) {
-        combined += segText;
-      } else {
-        combined = combined.replace(/[;,]+\s*$/, '') + '; ' + segText;
-      }
-    }
-
-    if (combined && !combined.endsWith('\n')) {
-      combined = combined.replace(/[;,]+\s*$/, '') + '; ';
-    }
-
-    sessionFinalText = combined;
-  }
-
-  function syncMemoFieldFromSpeech() {
-    const finalPart = sessionFinalText || '';
-    const interimPart = sessionInterimText || '';
-    let value = finalPart;
-    if (interimPart) {
-      if (!value) {
-        value = interimPart;
-      } else if (value.endsWith('\n') || value.endsWith('; ') || value.endsWith(' ')) {
-        value += interimPart;
-      } else {
-        value = value.replace(/[;,]+\s*$/, '') + '; ' + interimPart;
-      }
-    }
-    area.value = value;
-    localStorage.setItem('dashboard_scratchpad', area.value);
-    updateTransferButtonState();
-    autoResizeMemoField();
-    area.scrollTop = area.scrollHeight;
-  }
-
-  function flushInterimToFinal() {
-    if (sessionInterimText && sessionInterimText.trim()) {
-      const flushed = formatMemoSpeechText(sessionInterimText.trim()).replace(/[;,]+\s*$/, '').trim();
-      const cleanFinal = sessionFinalText.replace(/[;,]+\s*$/, '').trim();
-      if (flushed && !cleanFinal.toLowerCase().endsWith(flushed.toLowerCase())) {
-        const prefix = (sessionFinalText === '' || sessionFinalText.endsWith('\n') || sessionFinalText.endsWith('; ')) ? '' : '; ';
-        sessionFinalText += prefix + flushed + '; ';
-      }
-      sessionInterimText = '';
-    }
-  }
-
   function stopMic() {
-    clearTimeout(micRestartTimer);
-    clearTimeout(micStartRetryTimer);
-    micRestartTimer = null;
-    micStartRetryTimer = null;
-    if (!isRecording && !activeRecognition) return;
-    isRecording = false;
-    lastMicStopTime = Date.now();
-    setMicRecordingUI(false);
-
-    /* Capture any live interim words BEFORE aborting so nothing is lost */
-    flushInterimToFinal();
-
-    if (activeRecognition) {
-      const rec = activeRecognition;
-      activeRecognition = null;
-      try {
-        rec.onresult = null;
-        rec.onend = null;
-        rec.onerror = null;
-        rec.onaudiostart = null;
-        rec.onspeechstart = null;
-        /* abort() immediately releases iOS SFSpeechRecognizer so a 2nd dictation shortly after works reliably! */
-        if (typeof rec.abort === 'function') {
-          rec.abort();
-        } else {
-          rec.stop();
-        }
-      } catch {}
-    }
-
-    if (sessionFinalText) {
-      syncMemoFieldFromSpeech();
-      persistMemo();
-    }
-  }
-
-  /* Always instantiate a brand-new SpeechRecognition object (critical for iOS WebKit back-to-back dictation!) */
-  function startFreshMemoRecognitionSession() {
-    clearTimeout(micRestartTimer);
-    clearTimeout(micStartRetryTimer);
-    if (!isRecording || !SpeechRec) return;
-
-    const rec = new SpeechRec();
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.lang = 'de-DE';
-    activeRecognition = rec;
-
-    let lastResultEventTime = Date.now();
-    let audioConfirmed = false;
-
-    /* Injects "; " into cumulative iOS/Safari single-segment transcripts only after a clear pause (> 1150ms) between terms */
-    const applyPauseSplittingToSegment = (segObj, rawTranscript, now) => {
-      const trimmedRaw = rawTranscript.trim();
-      if (!trimmedRaw) return '';
-
-      if (!segObj.rawHistory) {
-        segObj.rawHistory = trimmedRaw;
-        segObj.withPauses = trimmedRaw;
-        return trimmedRaw;
-      }
-
-      const prevRaw = segObj.rawHistory;
-      if (trimmedRaw.toLowerCase() === prevRaw.toLowerCase()) {
-        return segObj.withPauses || trimmedRaw;
-      }
-
-      if (trimmedRaw.toLowerCase().startsWith(prevRaw.toLowerCase())) {
-        const addedPart = trimmedRaw.slice(prevRaw.length).trim();
-        if (addedPart) {
-          const pauseDuration = now - lastResultEventTime;
-          const baseWithPauses = (segObj.withPauses || prevRaw).replace(/[;,]+\s*$/, '').trim();
-          segObj.withPauses = pauseDuration > 1150
-            ? `${baseWithPauses}; ${addedPart}`
-            : `${baseWithPauses} ${addedPart}`;
-          segObj.rawHistory = trimmedRaw;
-          return segObj.withPauses;
-        }
-      }
-
-      segObj.rawHistory = trimmedRaw;
-      segObj.withPauses = trimmedRaw;
-      return trimmedRaw;
-    };
-
-    const markAudioActive = () => {
-      audioConfirmed = true;
-      micStartRetries = 0;
-      clearTimeout(micStartRetryTimer);
-    };
-
-    rec.onaudiostart = markAudioActive;
-    rec.onspeechstart = markAudioActive;
-
-    rec.onresult = (event) => {
-      markAudioActive();
-      const now = Date.now();
-      const currentInterimParts = [];
-
-      for (let i = 0; i < event.results.length; i++) {
-        const result = event.results[i];
-        const bestTranscript = result[0].transcript;
-        const existing = sessionSegments[i] || {
-          text: '',
-          rawHistory: '',
-          withPauses: ''
-        };
-
-        const pausedText = applyPauseSplittingToSegment(existing, bestTranscript, now);
-
-        if (result.isFinal) {
-          sessionSegments[i] = {
-            ...existing,
-            text: formatMemoSpeechText(pausedText)
-          };
-        } else {
-          sessionSegments[i] = {
-            ...existing,
-            text: ''
-          };
-          currentInterimParts.push(pausedText);
-        }
-      }
-
-      lastResultEventTime = now;
-      rebuildMemoFromSession();
-
-      const rawInterimCombined = currentInterimParts.join('; ').trim();
-      const processedInterim = rawInterimCombined
-        ? formatMemoSpeechText(rawInterimCombined).replace(/[;,]+\s*$/, '').trim()
-        : '';
-
-      const cleanInterim = processedInterim.replace(/[;,]+\s*$/, '').trim();
-      const cleanFinal = sessionFinalText.replace(/[;,]+\s*$/, '').trim();
-      if (cleanInterim && cleanFinal.toLowerCase().endsWith(cleanInterim.toLowerCase())) {
-        sessionInterimText = '';
-      } else {
-        sessionInterimText = processedInterim;
-      }
-
-      syncMemoFieldFromSpeech();
-    };
-
-    rec.onerror = (event) => {
-      if (activeRecognition !== rec) return;
-      const errCode = event?.error || '';
-      if (errCode === 'no-speech') return;
-      console.warn('Memo speech recognition warning:', errCode);
-      if (errCode === 'not-allowed' || errCode === 'service-not-allowed') {
-        stopMic();
-        showToast('Mikrofonzugriff bitte erlauben (Safari/iOS Einstellungen)');
-        return;
-      }
-      /* On iOS rapid back-to-back start, audio-capture/aborted can happen while previous session finishes releasing -> clean retry */
-      if ((errCode === 'audio-capture' || errCode === 'aborted') && isRecording && micStartRetries < 3) {
-        micStartRetries++;
-        activeRecognition = null;
-        try { rec.abort(); } catch {}
-        micRestartTimer = setTimeout(() => {
-          if (isRecording) startFreshMemoRecognitionSession();
-        }, 320);
-      }
-    };
-
-    rec.onend = () => {
-      if (activeRecognition !== rec) return;
-      activeRecognition = null;
-
-      if (isRecording) {
-        flushInterimToFinal();
-        sessionTranscriptBase = sessionFinalText;
-        sessionSegments = [];
-        syncMemoFieldFromSpeech();
-
-        /* Slight cooldown (220ms) gives iOS SFSpeechRecognizer time to release cleanly before next segment */
-        micRestartTimer = setTimeout(() => {
-          if (isRecording) {
-            startFreshMemoRecognitionSession();
-          }
-        }, 220);
-      }
-    };
-
     try {
-      rec.start();
-      /* Back-to-back iOS safety retry: if iOS audio session was still releasing from a just-ended dictation and onaudiostart hasn't fired after 750ms, cleanly restart once */
-      micStartRetryTimer = setTimeout(() => {
-        if (isRecording && activeRecognition === rec && !audioConfirmed && micStartRetries < 2) {
-          micStartRetries++;
-          activeRecognition = null;
-          try {
-            rec.onresult = null;
-            rec.onend = null;
-            rec.onerror = null;
-            rec.abort();
-          } catch {}
-          micRestartTimer = setTimeout(() => {
-            if (isRecording) startFreshMemoRecognitionSession();
-          }, 260);
-        }
-      }, 750);
-    } catch (e) {
-      console.warn('SpeechRecognition start busy, retrying shortly:', e);
-      activeRecognition = null;
-      if (isRecording && micStartRetries < 3) {
-        micStartRetries++;
-        micRestartTimer = setTimeout(() => {
-          if (isRecording) startFreshMemoRecognitionSession();
-        }, 300);
-      }
+      micFrame?.contentWindow?.__stopBoardSpeechMic?.();
+    } catch {}
+    if (isRecording) {
+      setMicRecordingUI(false);
     }
   }
 
-  micBtn?.addEventListener('click', () => {
-    if (isRecording) {
-      stopMic();
-      if (isIOS) {
-        /* iOS WebKit permanently wedges SFSpeechRecognizer after 1 session per document -> seamless SW-cached reload resets it cleanly so a 2nd/3rd dictation works every time! */
-        triggerBoardSeamlessReload('Aufnahme beendet ✓');
-        return;
+  window.__boardSpeechBridge = {
+    getBaseText() {
+      try { area.blur(); } catch {}
+      return area.value || '';
+    },
+    onText(value) {
+      area.value = value;
+      localStorage.setItem('dashboard_scratchpad', area.value);
+      updateTransferButtonState();
+      autoResizeMemoField();
+      area.scrollTop = area.scrollHeight;
+    },
+    onState(active, toastMsg = '') {
+      setMicRecordingUI(active);
+      if (!active) {
+        persistMemo();
       }
-      showToast('Aufnahme beendet ✓');
-      return;
-    }
-
-    if (!SpeechRec) {
+      if (toastMsg) showToast(toastMsg);
+    },
+    onToast(msg) {
+      if (msg) showToast(msg);
+    },
+    onUnsupported() {
       area.focus();
       showToast('Spracherkennung in diesem Browser nicht verfügbar – bitte Tastatur-Mikrofon nutzen');
-      return;
     }
-
-    /* Blur textarea so iOS keyboard does NOT pop up and steal audio focus from SpeechRecognition! */
-    try { area.blur(); } catch {}
-
-    clearTimeout(micRestartTimer);
-    clearTimeout(micStartRetryTimer);
-
-    if (activeRecognition) {
-      try {
-        activeRecognition.onresult = null;
-        activeRecognition.onend = null;
-        activeRecognition.onerror = null;
-        activeRecognition.abort();
-      } catch {}
-      activeRecognition = null;
-    }
-
-    const existing = area.value.trim();
-    sessionTranscriptBase = existing ? (existing.endsWith('\n') ? existing : existing.replace(/[;,]+\s*$/, '') + '; ') : '';
-    sessionFinalText = sessionTranscriptBase;
-    sessionInterimText = '';
-    sessionSegments = [];
-    micStartRetries = 0;
-    isRecording = true;
-    usedMicThisSession = true;
-    setMicRecordingUI(true);
-    showToast('🎤 Sprich jetzt… (erneut tippen zum Stoppen)');
-
-    startFreshMemoRecognitionSession();
-  });
+  };
 
   area.addEventListener('focus', () => {
     if (doneBtn) doneBtn.hidden = false;
@@ -1803,7 +1406,6 @@ function initScratchpad() {
   /* Silent transfer into Notizen app (dringend / JUH / privat) + clear scratchpad */
   transferBtns.forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const hadUsedMic = isRecording || usedMicThisSession;
       stopMic();
       const memoText = area.value.trim();
       const cat = btn.dataset.memoCat;
@@ -1821,10 +1423,6 @@ function initScratchpad() {
       btn.innerHTML = origHtml;
       if (res && res.ok) {
         area.value = '';
-        sessionTranscriptBase = '';
-        sessionFinalText = '';
-        sessionInterimText = '';
-        sessionSegments = [];
         autoResizeMemoField();
         localStorage.removeItem('dashboard_scratchpad');
         area.blur();
@@ -1833,14 +1431,9 @@ function initScratchpad() {
         try { localStorage.setItem('dashboard_notizen_has_notes', 'true'); } catch {}
         renderAppsGrid();
         const label = res.categoryLabel || cat;
-        const msg = res.appended
+        showToast(res.appended
           ? `An bestehende ${label}-Notiz angehängt ✓`
-          : `In Remembers (${label}) übertragen ✓`;
-        if (isIOS && hadUsedMic) {
-          triggerBoardSeamlessReload(msg);
-          return;
-        }
-        showToast(msg);
+          : `In Remembers (${label}) übertragen ✓`);
       } else {
         showToast(`Fehler beim Übertragen: ${res?.error || 'Bitte kurz warten & erneut tippen'}`);
       }

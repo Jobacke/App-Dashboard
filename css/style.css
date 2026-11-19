@@ -678,6 +678,17 @@ html[data-theme="light"] .icon-sun { display: none; }
   transition: transform 0.15s ease;
 }
 
+.scratchpad-mic-frame {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  flex-shrink: 0;
+  display: block;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
 .scratchpad-mic-btn {
   width: 28px;
   height: 28px;

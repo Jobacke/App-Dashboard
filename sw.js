@@ -1,7 +1,8 @@
-const CACHE_NAME = 'app-dashboard-v1.9.8';
+const CACHE_NAME = 'app-dashboard-v1.9.9';
 const ASSETS = [
   './',
   './index.html',
+  './speech-mic.html',
   './version.json',
   './css/style.css',
   './js/app.js',

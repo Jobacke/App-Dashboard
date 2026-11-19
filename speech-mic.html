@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Board Mikrofon</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+      display: grid;
+      place-items: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mic-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 42, 92, 0.45);
+      background: rgba(255, 42, 92, 0.14);
+      color: #ff4a70;
+      display: inline-grid;
+      place-items: center;
+      cursor: pointer;
+      outline: none;
+      transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease, border-color 0.16s ease;
+    }
+    .mic-btn svg {
+      width: 14px;
+      height: 14px;
+      pointer-events: none;
+    }
+    .mic-btn:hover {
+      background: rgba(255, 42, 92, 0.28);
+      color: #ffffff;
+    }
+    .mic-btn:active {
+      transform: scale(0.94);
+    }
+    .mic-btn.recording {
+      background: linear-gradient(135deg, #ff2a5c, #dc143c);
+      color: #ffffff;
+      border-color: transparent;
+      animation: micPulse 1.15s ease-out infinite;
+    }
+    @keyframes micPulse {
+      0% { box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0.45); }
+      50% { box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.15); }
+      100% { box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0.45); }
+    }
+  </style>
+</head>
+<body>
+  <button type="button" class="mic-btn" id="mic-btn" title="Kurznotiz per Sprache diktieren" aria-label="Kurznotiz per Sprache diktieren">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+      <line x1="12" y1="19" x2="12" y2="23"/>
+      <line x1="8" y1="23" x2="16" y2="23"/>
+    </svg>
+  </button>
+
+  <script>
+    (function () {
+      const micBtn = document.getElementById('mic-btn');
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      let activeRecognition = null;
+      let micMediaStream = null;
+      let isRecording = false;
+      let sessionTranscriptBase = '';
+      let sessionSegments = [];
+      let sessionFinalText = '';
+      let sessionInterimText = '';
+      let restartTimer = null;
+
+      function getParentBridge() {
+        try {
+          return window.parent && window.parent !== window ? window.parent.__boardSpeechBridge : null;
+        } catch {
+          return null;
+        }
+      }
+
+      const NUMBER_WORDS_DE = {
+        ein: '1', eine: '1', einen: '1', eins: '1',
+        zwei: '2', zwo: '2', drei: '3', vier: '4', fünf: '5',
+        sechs: '6', sieben: '7', acht: '8', neun: '9', zehn: '10',
+        elf: '11', zwölf: '12', fünfzehn: '15', zwanzig: '20'
+      };
+
+      const RD_TERMS = {
+        'vigo': 'Viggo', 'vigos': 'Viggos', 'viggo': 'Viggo',
+        'rtw': 'RTW', 'nef': 'NEF', 'ktw': 'KTW', 'juh': 'JUH', 'rd': 'RD',
+        'ekg': 'EKG', 'elektroden': 'EKG-Elektroden', 'nacl': 'NaCl 0,9%',
+        'jonosteril': 'Jonosteril', 'ringer': 'Ringer', 'mullbinde': 'Mullbinde',
+        'mullbinden': 'Mullbinden', 'kompresse': 'Kompresse', 'kompressen': 'Kompressen',
+        'laken': 'Laken', 'decke': 'Decke', 'decken': 'Decken'
+      };
+
+      function formatSpeechText(rawText) {
+        if (!rawText) return '';
+        let text = String(rawText);
+
+        text = text.replace(/\b(?:neue\s+)?zeile\b/gi, '\n');
+        text = text.replace(/\b(?:neuer\s+)?absatz\b/gi, '\n\n');
+        text = text.replace(/\b(?:semikolon|strichpunkt)\b/gi, '; ');
+
+        const UNIT_LOOKAHEAD = '(?:cm|mm|m|km|ml|l|dl|cl|mg|g|kg|µg|mcg|ug|ie|i\\.e\\.|iu|ch|charri[eè]re|gauge|zoll|uhr|min|sek|std|h|grad|prozent|%|bar|mmhg|mmol|liter|milliliter|gramm|milligramm|mikrogramm|zentimeter|millimeter|meter|er|te|ten|ter)\\b';
+
+        text = text.replace(/\b(ein|eine|einen|eins|zwei|zwo|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|fünfzehn|zwanzig)[ \t]*(?:mal|[xX×*])\b/gi, (m, w) => {
+          return `${NUMBER_WORDS_DE[w.toLowerCase()] || w} x`;
+        });
+        text = text.replace(/\b(\d+)[ \t]*(?:mal|[xX×*])\b(?=[ \t]*[A-Za-zÄÖÜäöüß])/gi, '$1 x');
+        text = text.replace(new RegExp(`\\b(ein|eine|einen|eins|zwei|zwo|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|fünfzehn|zwanzig)[ \\t]+(?=${UNIT_LOOKAHEAD})`, 'gi'), (m, w) => {
+          return `${NUMBER_WORDS_DE[w.toLowerCase()] || w} `;
+        });
+        text = text.replace(new RegExp(`\\b(ein|eine|einen|eins|zwei|zwo|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|fünfzehn|zwanzig)[ \\t]+(?!x\\b|mal\\b|${UNIT_LOOKAHEAD})(?=[A-ZÄÖÜa-zäöüß]{2,})`, 'gi'), (m, w) => {
+          return `${NUMBER_WORDS_DE[w.toLowerCase()] || w} x `;
+        });
+
+        for (const [wrong, correct] of Object.entries(RD_TERMS)) {
+          const esc = wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          text = text.replace(new RegExp(`(?<![\\wÄÖÜäöüß])${esc}(?![\\wÄÖÜäöüß])`, 'gi'), correct);
+        }
+
+        text = text.replace(/\b(\d+)[ \t]*(?:(?:[xX×*]|mal)[ \t]*)+(?=[A-Za-zÄÖÜäöüß])/gi, '$1 x ');
+        text = text.replace(new RegExp(`\\b(\\d+)[ \\t]+(?!(?:[xX×*]|mal)\\b|${UNIT_LOOKAHEAD})([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]{1,})`, 'gi'), '$1 x $2');
+        text = text.replace(/\b(\d+)[ \t]*(?:[xX×*][ \t]*){2,}/g, '$1 x ');
+        text = text.replace(/\bEKG\s+EKG-Elektroden\b/gi, 'EKG-Elektroden');
+        text = text.replace(/\bNaCl(?:\s+0,9%){2,}/gi, 'NaCl 0,9%');
+        text = text.replace(new RegExp(`\\b(\\d+(?:[.,]\\d+)?)[ \\t]*(?:[xX×*]|mal)[ \\t]*(?=${UNIT_LOOKAHEAD})`, 'gi'), '$1 ');
+        text = text.replace(new RegExp(`(?<!\\bmal)([A-Za-zÄÖÜäöüß]{2,}|%)[ \\t]*(?:,|;|\\bund\\b)?[ \\t]+(?=\\d+[ \\t]*(?:x[ \\t]+[A-Za-zÄÖÜäöüß0-9]|${UNIT_LOOKAHEAD}[ \\t]+[A-Za-zÄÖÜäöüß]{2,}))`, 'gi'), '$1; ');
+
+        text = text.replace(/[ \t]*;[ \t]*/g, '; ');
+        text = text.replace(/(?:;\s*){2,}/g, '; ');
+        text = text.replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n');
+        return text;
+      }
+
+      function rebuildFromSession() {
+        let combined = (sessionTranscriptBase || '').trim();
+        for (let idx = 0; idx < sessionSegments.length; idx++) {
+          const seg = sessionSegments[idx];
+          if (!seg || !seg.text) continue;
+          let segText = seg.text.trim();
+          const prevSeg = idx > 0 ? sessionSegments[idx - 1] : null;
+          if (prevSeg && prevSeg.text) {
+            const prevText = prevSeg.text.trim();
+            if (segText.toLowerCase() === prevText.toLowerCase()) continue;
+            if (segText.toLowerCase().startsWith(prevText.toLowerCase())) {
+              segText = segText.slice(prevText.length).replace(/^[;,\s]+/, '').trim();
+              if (!segText) continue;
+            }
+          }
+          segText = segText.replace(/[;,]+\s*$/, '').trim();
+          if (!segText) continue;
+
+          if (combined === '') {
+            combined = segText;
+          } else if (segText.startsWith('\n') || combined.endsWith('\n')) {
+            combined += segText;
+          } else {
+            combined = combined.replace(/[;,]+\s*$/, '') + '; ' + segText;
+          }
+        }
+        if (combined && !combined.endsWith('\n')) {
+          combined = combined.replace(/[;,]+\s*$/, '') + '; ';
+        }
+        sessionFinalText = combined;
+      }
+
+      function pushValueToParent() {
+        const bridge = getParentBridge();
+        if (!bridge) return;
+        let value = sessionFinalText || '';
+        const interim = sessionInterimText || '';
+        if (interim) {
+          if (!value) {
+            value = interim;
+          } else if (value.endsWith('\n') || value.endsWith('; ') || value.endsWith(' ')) {
+            value += interim;
+          } else {
+            value = value.replace(/[;,]+\s*$/, '') + '; ' + interim;
+          }
+        }
+        bridge.onText(value);
+      }
+
+      function flushInterim() {
+        if (sessionInterimText && sessionInterimText.trim()) {
+          const flushed = formatSpeechText(sessionInterimText.trim()).replace(/[;,]+\s*$/, '').trim();
+          const cleanFinal = sessionFinalText.replace(/[;,]+\s*$/, '').trim();
+          if (flushed && !cleanFinal.toLowerCase().endsWith(flushed.toLowerCase())) {
+            const prefix = (sessionFinalText === '' || sessionFinalText.endsWith('\n') || sessionFinalText.endsWith('; ')) ? '' : '; ';
+            sessionFinalText += prefix + flushed + '; ';
+          }
+          sessionInterimText = '';
+        }
+      }
+
+      function releaseStream() {
+        if (micMediaStream) {
+          try { micMediaStream.getTracks().forEach((t) => t.stop()); } catch {}
+          micMediaStream = null;
+        }
+      }
+
+      function stopAndRecycleIframe(notifyToast = false) {
+        clearTimeout(restartTimer);
+        const wasRecording = isRecording;
+        isRecording = false;
+        micBtn.classList.remove('recording');
+
+        flushInterim();
+        if (sessionFinalText) {
+          pushValueToParent();
+        }
+
+        if (activeRecognition) {
+          const rec = activeRecognition;
+          activeRecognition = null;
+          try {
+            rec.onresult = null;
+            rec.onend = null;
+            rec.onerror = null;
+            rec.stop();
+          } catch {}
+        }
+
+        releaseStream();
+
+        const bridge = getParentBridge();
+        if (bridge) {
+          bridge.onState(false, notifyToast && wasRecording ? 'Aufnahme beendet ✓' : '');
+        }
+
+        /* CRITICAL FOR iOS WEBKIT:
+           Reload ONLY this tiny 28x28px iframe so iOS allocates a 100% fresh Document + SFSpeechRecognizer
+           for the next dictation — WITHOUT ever reloading the parent Board page! */
+        if (wasRecording) {
+          setTimeout(() => {
+            try {
+              window.location.reload();
+            } catch {}
+          }, 80);
+        }
+      }
+
+      function startFreshRecognition() {
+        if (!isRecording || !SpeechRec) return;
+
+        const rec = new SpeechRec();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = 'de-DE';
+        activeRecognition = rec;
+
+        let lastResultEventTime = Date.now();
+
+        const applyPauseSplitting = (segObj, rawTranscript, now) => {
+          const trimmedRaw = rawTranscript.trim();
+          if (!trimmedRaw) return '';
+          if (!segObj.rawHistory) {
+            segObj.rawHistory = trimmedRaw;
+            segObj.withPauses = trimmedRaw;
+            return trimmedRaw;
+          }
+          const prevRaw = segObj.rawHistory;
+          if (trimmedRaw.toLowerCase() === prevRaw.toLowerCase()) {
+            return segObj.withPauses || trimmedRaw;
+          }
+          if (trimmedRaw.toLowerCase().startsWith(prevRaw.toLowerCase())) {
+            const addedPart = trimmedRaw.slice(prevRaw.length).trim();
+            if (addedPart) {
+              const pauseDuration = now - lastResultEventTime;
+              const baseWithPauses = (segObj.withPauses || prevRaw).replace(/[;,]+\s*$/, '').trim();
+              segObj.withPauses = pauseDuration > 1150
+                ? `${baseWithPauses}; ${addedPart}`
+                : `${baseWithPauses} ${addedPart}`;
+              segObj.rawHistory = trimmedRaw;
+              return segObj.withPauses;
+            }
+          }
+          segObj.rawHistory = trimmedRaw;
+          segObj.withPauses = trimmedRaw;
+          return trimmedRaw;
+        };
+
+        rec.onresult = (event) => {
+          const now = Date.now();
+          const currentInterimParts = [];
+
+          for (let i = 0; i < event.results.length; i++) {
+            const result = event.results[i];
+            const bestTranscript = result[0].transcript;
+            const existing = sessionSegments[i] || { text: '', rawHistory: '', withPauses: '' };
+            const pausedText = applyPauseSplitting(existing, bestTranscript, now);
+
+            if (result.isFinal) {
+              sessionSegments[i] = { ...existing, text: formatSpeechText(pausedText) };
+            } else {
+              sessionSegments[i] = { ...existing, text: '' };
+              currentInterimParts.push(pausedText);
+            }
+          }
+
+          lastResultEventTime = now;
+          rebuildFromSession();
+
+          const rawInterimCombined = currentInterimParts.join('; ').trim();
+          const processedInterim = rawInterimCombined
+            ? formatSpeechText(rawInterimCombined).replace(/[;,]+\s*$/, '').trim()
+            : '';
+
+          const cleanInterim = processedInterim.replace(/[;,]+\s*$/, '').trim();
+          const cleanFinal = sessionFinalText.replace(/[;,]+\s*$/, '').trim();
+          if (cleanInterim && cleanFinal.toLowerCase().endsWith(cleanInterim.toLowerCase())) {
+            sessionInterimText = '';
+          } else {
+            sessionInterimText = processedInterim;
+          }
+
+          pushValueToParent();
+        };
+
+        rec.onerror = (event) => {
+          const errCode = event?.error || '';
+          if (errCode === 'no-speech' || errCode === 'aborted') return;
+          console.warn('Speech mic iframe warning:', errCode);
+          if (errCode === 'not-allowed' || errCode === 'service-not-allowed') {
+            const bridge = getParentBridge();
+            stopAndRecycleIframe(false);
+            bridge?.onToast('Mikrofonzugriff bitte erlauben (Safari/iOS Einstellungen)');
+          }
+        };
+
+        rec.onend = () => {
+          if (activeRecognition !== rec) return;
+          activeRecognition = null;
+          if (isRecording) {
+            flushInterim();
+            sessionTranscriptBase = sessionFinalText;
+            sessionSegments = [];
+            pushValueToParent();
+            restartTimer = setTimeout(() => {
+              if (isRecording) startFreshRecognition();
+            }, 120);
+          }
+        };
+
+        try {
+          rec.start();
+        } catch (e) {
+          console.warn('Could not start SpeechRecognition synchronously:', e);
+        }
+      }
+
+      micBtn.addEventListener('click', async () => {
+        const bridge = getParentBridge();
+
+        if (isRecording) {
+          stopAndRecycleIframe(true);
+          return;
+        }
+
+        if (!SpeechRec) {
+          bridge?.onUnsupported();
+          return;
+        }
+
+        const existing = (bridge?.getBaseText() || '').trim();
+        sessionTranscriptBase = existing ? (existing.endsWith('\n') ? existing : existing.replace(/[;,]+\s*$/, '') + '; ') : '';
+        sessionFinalText = sessionTranscriptBase;
+        sessionInterimText = '';
+        sessionSegments = [];
+        isRecording = true;
+        micBtn.classList.add('recording');
+        bridge?.onState(true, '🎤 Sprich jetzt… (erneut tippen zum Stoppen)');
+
+        /* 1:1 Remembers pattern:
+           1) Synchronous SpeechRecognition.start() inside this iframe's own direct tap gesture! */
+        startFreshRecognition();
+
+        /* 2) Activate iOS AVAudioSession via getUserMedia (NO AudioContext on iOS!) */
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+              }
+            });
+            if (!isRecording) {
+              stream.getTracks().forEach((t) => t.stop());
+              return;
+            }
+            micMediaStream = stream;
+          } catch (err) {
+            console.warn('Mic iframe getUserMedia error:', err);
+            if (err && err.name === 'NotAllowedError') {
+              stopAndRecycleIframe(false);
+              bridge?.onToast('Mikrofonzugriff nicht erlaubt – bitte in iOS Einstellungen erlauben');
+            }
+          }
+        }
+      });
+
+      /* Allow parent Board (e.g. when tapping dringend / JUH / privat / Fertig) to stop cleanly */
+      window.__stopBoardSpeechMic = () => {
+        if (isRecording) {
+          stopAndRecycleIframe(false);
+        }
+      };
+    })();
+  </script>
+</body>
+</html>
