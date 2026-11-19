@@ -1,5 +1,5 @@
 {
-  "version": "2.1.1",
+  "version": "2.1.2",
   "date": "2026-11-19",
-  "notes": "Whisper-Halluzinations- & Stille-Filter am Aufnahme-Ende (kein kryptischer Text mehr)"
+  "notes": "Sauberes Deutsch über vollwertiges whisper-large-v3 + unzerschnittene iOS-MP4-Aufnahme ohne 250ms-Stückelung"
 }

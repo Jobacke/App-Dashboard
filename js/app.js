@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '2.1.1';
+const APP_VERSION = '2.1.2';
 const APP_BUILD_DATE = '19.11.2026';
 
 const APPS = [
@@ -1346,11 +1346,6 @@ function initScratchpad() {
   let audioChunks = [];
   let isTranscribing = false;
   let recordTimerInterval = null;
-  let livePreviewInterval = null;
-  let livePreviewInFlight = false;
-  let livePreviewUnsupported = false;
-  let livePreviewAbortCtrl = null;
-  let lastPreviewSize = 0;
   let recordStartTime = 0;
   let recordingSessionId = 0;
   let baseTextBeforeRecording = '';
@@ -1536,20 +1531,9 @@ function initScratchpad() {
     }
   }
 
-  function stopLivePreviewLoop() {
-    clearInterval(livePreviewInterval);
-    livePreviewInterval = null;
-    livePreviewInFlight = false;
-    if (livePreviewAbortCtrl) {
-      try { livePreviewAbortCtrl.abort(); } catch {}
-      livePreviewAbortCtrl = null;
-    }
-  }
-
   function releaseMicStream() {
     clearInterval(recordTimerInterval);
     recordTimerInterval = null;
-    stopLivePreviewLoop();
     if (micMediaStream) {
       try { micMediaStream.getTracks().forEach((t) => t.stop()); } catch {}
       micMediaStream = null;
@@ -1574,7 +1558,7 @@ function initScratchpad() {
     area.scrollTop = area.scrollHeight;
   }
 
-  async function transcribeAudioWithGroq(audioBlob, signal = null) {
+  async function transcribeAudioWithGroq(audioBlob) {
     const apiKey = getGroqKey();
     if (!apiKey) return { ok: false, error: 'Kein Groq-API-Key hinterlegt' };
     if (!audioBlob || audioBlob.size < 400) return { ok: false, error: 'Aufnahme zu kurz' };
@@ -1587,24 +1571,22 @@ function initScratchpad() {
 
     const formData = new FormData();
     formData.append('file', audioBlob, `memo.${ext}`);
-    formData.append('model', 'whisper-large-v3-turbo');
+    /* Full flagship whisper-large-v3 gives dramatically cleaner native German than turbo! */
+    formData.append('model', 'whisper-large-v3');
     formData.append('language', 'de');
     formData.append('response_format', 'verbose_json');
     formData.append('temperature', '0');
-    /* Keep prompt short & vocabulary-only (no instruction sentences or example quantities that Whisper could echo on silence!) */
+    /* Natural German context sentence (never starting with foreign-looking words like "Viggo" which nudge Scandinavian phonetics!) */
     formData.append(
       'prompt',
-      'Viggo, Jonosteril, NaCl 0,9%, Ringer, Mullbinde, Kompressen, Decken, Laken, EKG-Elektroden, Verbandpäckchen, Handschuhe, Pflaster, Spritze, Kanüle, RTW, NEF, KTW, JUH, ZNA.'
+      'Deutsche Notiz im Rettungsdienst: Decken, Laken, Mullbinden, Kompressen, Verbandpäckchen, Handschuhe, Pflaster, Spritzen, Kanülen, Infusionen, Jonosteril, Ringer, NaCl 0,9%, EKG-Elektroden, Viggo.'
     );
 
-    const fetchOpts = {
+    const resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}` },
       body: formData
-    };
-    if (signal) fetchOpts.signal = signal;
-
-    const resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', fetchOpts);
+    });
 
     if (!resp.ok) {
       if (resp.status === 401) {
@@ -1614,19 +1596,17 @@ function initScratchpad() {
     }
 
     const data = await resp.json();
-    const HALLUCINATION_RE = /(?:untertitel|amara\.org|vielen dank fürs zuschauen|vielen dank für ihre aufmerksamkeit|abonnier|copyright|www\.|https?:|begriffe mit semikolon|materialauffüllung|viggo,\s*jonosteril|^\s*(?:tschüss|danke|musik|applaus|mbc|zdf|ard|swr|wdr|ndr|orf|srf)\s*[.!?]*\s*$)/i;
+    const HALLUCINATION_RE = /(?:untertitel|amara\.org|vielen dank fürs zuschauen|vielen dank für ihre aufmerksamkeit|abonnier|copyright|www\.|https?:|deutsche notiz im rettungsdienst|decken,\s*laken,\s*mullbinden|^\s*(?:tschüss|danke|musik|applaus|mbc|zdf|ard|swr|wdr|ndr|orf|srf)\s*[.!?]*\s*$)/i;
     const CRYPTIC_CHAR_RE = /[^\u0020-\u007E\u00A0-\u024F\u2010-\u2026€%°²³µ×\n\r\t]/;
 
     function isBadWhisperSegment(seg) {
       const txt = String(seg?.text || '').trim();
       if (!txt) return true;
-      /* Filter silence / button-click noise & low-confidence cryptic Whisper tail hallucinations */
       if (typeof seg.no_speech_prob === 'number' && seg.no_speech_prob > 0.55) return true;
       if (typeof seg.avg_logprob === 'number' && seg.avg_logprob < -0.85) return true;
       if (typeof seg.compression_ratio === 'number' && seg.compression_ratio > 2.4) return true;
       if (CRYPTIC_CHAR_RE.test(txt)) return true;
       if (HALLUCINATION_RE.test(txt)) return true;
-      /* Drop pure punctuation or single stray non-alphanumeric symbol */
       if (!/[A-Za-zÄÖÜäöüß0-9]/.test(txt)) return true;
       return false;
     }
@@ -1637,7 +1617,6 @@ function initScratchpad() {
       for (const seg of data.segments) {
         if (isBadWhisperSegment(seg)) continue;
         const segText = String(seg.text || '').trim();
-        /* Deduplicate identical trailing Whisper loop segments */
         if (cleanSegs.length > 0 && cleanSegs[cleanSegs.length - 1].toLowerCase() === segText.toLowerCase()) {
           continue;
         }
@@ -1653,42 +1632,9 @@ function initScratchpad() {
 
     const formatted = formatMemoSpeechText(rawCombined);
     if (!formatted || HALLUCINATION_RE.test(formatted) || CRYPTIC_CHAR_RE.test(formatted)) {
-      return { ok: false, error: 'Keine Sprache erkannt – bitte näher ins Mikrofon sprechen' };
+      return { ok: false, error: 'Keine Sprache erkannt – bitte deutlich ins Mikrofon sprechen' };
     }
     return { ok: true, text: formatted };
-  }
-
-  function startLivePreviewLoop(mySessionId) {
-    stopLivePreviewLoop();
-    livePreviewUnsupported = false;
-    lastPreviewSize = 0;
-
-    livePreviewInterval = setInterval(async () => {
-      if (!isRecording || mySessionId !== recordingSessionId || livePreviewInFlight || livePreviewUnsupported) return;
-      if (audioChunks.length < 4) return;
-
-      const snapBlob = new Blob(audioChunks.slice(), { type: currentRecordingMime });
-      if (snapBlob.size < 1200 || snapBlob.size === lastPreviewSize) return;
-      lastPreviewSize = snapBlob.size;
-
-      livePreviewInFlight = true;
-      livePreviewAbortCtrl = new AbortController();
-      try {
-        const res = await transcribeAudioWithGroq(snapBlob, livePreviewAbortCtrl.signal);
-        if (!isRecording || mySessionId !== recordingSessionId) return;
-        if (res.ok && res.text) {
-          applyRecognizedTextToField(res.text, false);
-        } else if (res.status === 400 || res.status === 415) {
-          /* Browser does not emit self-contained fragmented chunks mid-stream -> disable live probe silently and rely on final Stop pass */
-          livePreviewUnsupported = true;
-        }
-      } catch {
-        /* Aborted on stop or temporary hiccup — final Stop transcription handles everything cleanly */
-      } finally {
-        livePreviewInFlight = false;
-        livePreviewAbortCtrl = null;
-      }
-    }, 2400);
   }
 
   function stopAndTranscribeRecording() {
@@ -1705,7 +1651,6 @@ function initScratchpad() {
       isRecording = false;
       clearInterval(recordTimerInterval);
       recordTimerInterval = null;
-      stopLivePreviewLoop();
       const recorder = mediaRecorder;
       mediaRecorder = null;
 
@@ -1757,8 +1702,7 @@ function initScratchpad() {
       } catch {
         finish();
       }
-      /* Safety fallback in case iOS delays onstop */
-      setTimeout(finish, 700);
+      setTimeout(finish, 900);
     });
   }
 
@@ -1795,7 +1739,7 @@ function initScratchpad() {
       micMediaStream = stream;
       audioChunks = [];
       baseTextBeforeRecording = area.value.trim();
-      const mySessionId = ++recordingSessionId;
+      ++recordingSessionId;
 
       const isIOSDevice = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       const preferredMimes = isIOSDevice
@@ -1818,13 +1762,12 @@ function initScratchpad() {
         }
       };
 
-      mediaRecorder.start(250);
+      /* CRITICAL FOR iOS AUDIO QUALITY: start() WITHOUT timeslice writes one single pristine MP4/AAC container instead of chopped 250ms fragments! */
+      mediaRecorder.start();
       isRecording = true;
       recordStartTime = Date.now();
       setMicUIState('recording', '● 0:00');
       showToast('🎤 Sprich jetzt… (erneut tippen zum Stoppen)');
-
-      startLivePreviewLoop(mySessionId);
 
       recordTimerInterval = setInterval(() => {
         if (!isRecording) return;
