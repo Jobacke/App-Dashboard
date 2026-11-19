@@ -703,6 +703,16 @@ html[data-theme="light"] .icon-sun { display: none; }
   100% { box-shadow: 0 0 0 0 rgba(255, 42, 92, 0); }
 }
 
+.scratchpad-saved.recording {
+  color: #ff4a70;
+  font-weight: 700;
+}
+
+.scratchpad-input.mic-listening {
+  border-color: rgba(255, 42, 92, 0.72);
+  box-shadow: 0 0 0 2px rgba(255, 42, 92, 0.18);
+}
+
 .scratchpad-save-btn[hidden] {
   display: none;
 }

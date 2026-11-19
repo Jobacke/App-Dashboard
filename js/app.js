@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.9.4';
+const APP_VERSION = '1.9.5';
 const APP_BUILD_DATE = '19.11.2026';
 
 const APPS = [
@@ -1313,20 +1313,15 @@ function initScratchpad() {
     if (!document.hidden) pingNotizen();
   });
 
-  /* Champions-League Microphone Dictation (Live SpeechRecognition + Reliable iOS PWA Auto-Semicolon Dictation) */
+  /* Champions-League Microphone Dictation (1:1 Port of Notizen App's Proven iOS Speech Engine!) */
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   let activeRecognition = null;
+  let micMediaStream = null;
   let isRecording = false;
-  let iosKeyboardDictationMode = false;
-  let isComposing = false;
-  let dictationPauseTimer = null;
-  let speechWatchdogTimer = null;
   let sessionTranscriptBase = '';
   let sessionSegments = [];
   let sessionFinalText = '';
   let sessionInterimText = '';
-  let micStartedAt = 0;
 
   const MEMO_NUMBER_WORDS_DE = {
     ein: '1', eine: '1', einen: '1', eins: '1',
@@ -1344,7 +1339,7 @@ function initScratchpad() {
     'laken': 'Laken', 'decke': 'Decke', 'decken': 'Decken'
   };
 
-  function formatMemoSpeechText(rawText, convertPausePunctuation = false) {
+  function formatMemoSpeechText(rawText) {
     if (!rawText) return '';
     let text = String(rawText);
 
@@ -1352,13 +1347,6 @@ function initScratchpad() {
     text = text.replace(/\b(?:neue\s+)?zeile\b/gi, '\n');
     text = text.replace(/\b(?:neuer\s+)?absatz\b/gi, '\n\n');
     text = text.replace(/\b(?:semikolon|strichpunkt)\b/gi, '; ');
-
-    /* Convert iOS keyboard dictation punctuation (non-decimal commas & pause periods) to "; " */
-    if (convertPausePunctuation) {
-      /* Protect decimal commas (0,9%) and medical abbreviations (Z.n., V.a., z.B., Stk.) */
-      text = text.replace(/(?<!\d),(?!\d)\s*/g, '; ');
-      text = text.replace(/(?<!\b(?:z|v|n|a|b|stk|st|nr|ca|dr|inkl|ggf|evtl|bzw|u|s|o|d))\.(?=\s|$)/gi, ';');
-    }
 
     const UNIT_LOOKAHEAD = '(?:cm|mm|m|km|ml|l|dl|cl|mg|g|kg|µg|mcg|ug|ie|i\\.e\\.|iu|ch|charri[eè]re|gauge|zoll|uhr|min|sek|std|h|grad|prozent|%|bar|mmhg|mmol|liter|milliliter|gramm|milligramm|mikrogramm|zentimeter|millimeter|meter|er|te|ten|ter)\\b';
 
@@ -1398,18 +1386,17 @@ function initScratchpad() {
     return text;
   }
 
-  function applySemicolonFormattingToField(ensureTrailingSemicolon = true) {
-    const raw = area.value;
-    const trimmed = raw.trim();
-    if (!trimmed) return;
-    let formatted = formatMemoSpeechText(trimmed, true).trim();
-    if (ensureTrailingSemicolon && formatted && !formatted.endsWith('\n')) {
-      formatted = formatted.replace(/[;,]+\s*$/, '').trim() + '; ';
-    }
-    if (formatted !== area.value) {
-      area.value = formatted;
-      try { area.setSelectionRange(area.value.length, area.value.length); } catch {}
-      persistMemo();
+  function setMicRecordingUI(active) {
+    micBtn?.classList.toggle('recording', active);
+    area.classList.toggle('mic-listening', active);
+    if (status) {
+      if (active) {
+        status.textContent = '● Hört zu…';
+        status.classList.add('visible', 'recording');
+      } else {
+        status.textContent = 'Gespeichert';
+        status.classList.remove('recording');
+      }
     }
   }
 
@@ -1463,15 +1450,15 @@ function initScratchpad() {
         value = value.replace(/[;,]+\s*$/, '') + '; ' + interimPart;
       }
     }
-    if (value) {
-      area.value = value;
-      persistMemo();
-    }
+    area.value = value;
+    localStorage.setItem('dashboard_scratchpad', area.value);
+    updateTransferButtonState();
+    area.scrollTop = area.scrollHeight;
   }
 
   function flushInterimToFinal() {
     if (sessionInterimText && sessionInterimText.trim()) {
-      const flushed = formatMemoSpeechText(sessionInterimText.trim(), true).replace(/[;,]+\s*$/, '').trim();
+      const flushed = formatMemoSpeechText(sessionInterimText.trim()).replace(/[;,]+\s*$/, '').trim();
       const cleanFinal = sessionFinalText.replace(/[;,]+\s*$/, '').trim();
       if (flushed && !cleanFinal.toLowerCase().endsWith(flushed.toLowerCase())) {
         const prefix = (sessionFinalText === '' || sessionFinalText.endsWith('\n') || sessionFinalText.endsWith('; ')) ? '' : '; ';
@@ -1481,64 +1468,50 @@ function initScratchpad() {
     }
   }
 
-  function stopMic(keepDictationMode = false) {
-    isRecording = false;
-    clearTimeout(speechWatchdogTimer);
-    clearTimeout(dictationPauseTimer);
-    if (!keepDictationMode) {
-      iosKeyboardDictationMode = false;
-      micBtn?.classList.remove('recording');
+  function releaseMicStream() {
+    if (micMediaStream) {
+      try { micMediaStream.getTracks().forEach((t) => t.stop()); } catch {}
+      micMediaStream = null;
     }
+  }
+
+  function stopMic() {
+    if (!isRecording && !activeRecognition && !micMediaStream) return;
+    isRecording = false;
+    setMicRecordingUI(false);
+
     if (activeRecognition) {
       const rec = activeRecognition;
       activeRecognition = null;
-      try { rec.stop(); } catch {}
+      try {
+        rec.onresult = null;
+        rec.onend = null;
+        rec.onerror = null;
+        rec.stop();
+      } catch {}
     }
+
+    releaseMicStream();
     flushInterimToFinal();
     if (sessionFinalText) {
       syncMemoFieldFromSpeech();
-    }
-  }
-
-  function enterIosKeyboardDictationMode() {
-    stopMic(true);
-    iosKeyboardDictationMode = true;
-    micBtn?.classList.add('recording');
-    /* Prepare trailing "; " if field already has text */
-    const cur = area.value.trim();
-    if (cur && !cur.endsWith('\n') && !area.value.endsWith('; ')) {
-      area.value = cur.replace(/[;,]+\s*$/, '') + '; ';
       persistMemo();
     }
-    area.focus();
-    try { area.setSelectionRange(area.value.length, area.value.length); } catch {}
-    showToast('🎤 Tastatur-Mikrofon unten rechts tippen – "; " wird automatisch gesetzt');
   }
 
+  /* Always instantiate a brand-new SpeechRecognition object (critical for iOS WebKit, 1:1 from Notizen app!) */
   function startFreshMemoRecognitionSession() {
     if (!isRecording || !SpeechRec) return;
 
     const rec = new SpeechRec();
-    rec.lang = 'de-DE';
+    rec.continuous = true;
     rec.interimResults = true;
-    rec.continuous = !isIOS;
-    rec.maxAlternatives = 1;
+    rec.lang = 'de-DE';
     activeRecognition = rec;
 
     let lastResultEventTime = Date.now();
-    let receivedAnyEvent = false;
 
-    clearTimeout(speechWatchdogTimer);
-    if (isIOS) {
-      /* On iOS WebKit, if SpeechRecognition silently produces nothing within 3.5s, fall back to reliable Keyboard Dictation */
-      speechWatchdogTimer = setTimeout(() => {
-        if (isRecording && !receivedAnyEvent) {
-          enterIosKeyboardDictationMode();
-        }
-      }, 3500);
-    }
-
-    /* Exact same pause splitter as Notizen app: > 550ms pause between words inserts "; " */
+    /* Injects "; " into cumulative iOS/Safari single-segment transcripts when the user pauses > 550ms between terms */
     const applyPauseSplittingToSegment = (segObj, rawTranscript, now) => {
       const trimmedRaw = rawTranscript.trim();
       if (!trimmedRaw) return '';
@@ -1572,14 +1545,7 @@ function initScratchpad() {
       return trimmedRaw;
     };
 
-    rec.onspeechstart = () => {
-      receivedAnyEvent = true;
-      clearTimeout(speechWatchdogTimer);
-    };
-
     rec.onresult = (event) => {
-      receivedAnyEvent = true;
-      clearTimeout(speechWatchdogTimer);
       const now = Date.now();
       const currentInterimParts = [];
 
@@ -1597,7 +1563,7 @@ function initScratchpad() {
         if (result.isFinal) {
           sessionSegments[i] = {
             ...existing,
-            text: formatMemoSpeechText(pausedText, true)
+            text: formatMemoSpeechText(pausedText)
           };
         } else {
           sessionSegments[i] = {
@@ -1613,7 +1579,7 @@ function initScratchpad() {
 
       const rawInterimCombined = currentInterimParts.join('; ').trim();
       const processedInterim = rawInterimCombined
-        ? formatMemoSpeechText(rawInterimCombined, true).replace(/[;,]+\s*$/, '').trim() + '; '
+        ? formatMemoSpeechText(rawInterimCombined).replace(/[;,]+\s*$/, '').trim() + '; '
         : '';
 
       const cleanInterim = processedInterim.replace(/[;,]+\s*$/, '').trim();
@@ -1630,23 +1596,16 @@ function initScratchpad() {
     rec.onerror = (event) => {
       const errCode = event?.error || '';
       if (errCode === 'no-speech' || errCode === 'aborted') return;
-      if (isIOS) {
-        enterIosKeyboardDictationMode();
-      } else {
+      console.warn('Memo speech recognition warning:', errCode);
+      if (errCode === 'not-allowed' || errCode === 'service-not-allowed') {
         stopMic();
-        showToast('Mikrofon nicht verfügbar – bitte Berechtigung prüfen');
+        showToast('Mikrofonzugriff bitte erlauben (Safari/iOS Einstellungen)');
       }
     };
 
     rec.onend = () => {
-      const elapsed = Date.now() - micStartedAt;
       if (activeRecognition !== rec) return;
-
-      const hadAnySpeech = sessionFinalText.trim() !== sessionTranscriptBase.trim() || sessionInterimText.trim().length > 0;
-      if (isRecording && !hadAnySpeech && elapsed < 1200 && isIOS) {
-        enterIosKeyboardDictationMode();
-        return;
-      }
+      activeRecognition = null;
 
       if (isRecording) {
         flushInterimToFinal();
@@ -1655,64 +1614,82 @@ function initScratchpad() {
         syncMemoFieldFromSpeech();
 
         setTimeout(() => {
-          if (isRecording && activeRecognition === rec) {
-            try {
-              rec.start();
-            } catch {
-              startFreshMemoRecognitionSession();
-            }
+          if (isRecording) {
+            startFreshMemoRecognitionSession();
           }
-        }, 120);
+        }, 100);
       }
     };
 
     try {
       rec.start();
-    } catch {
-      enterIosKeyboardDictationMode();
+    } catch (e) {
+      console.warn('Could not start SpeechRecognition synchronously:', e);
     }
   }
 
-  micBtn?.addEventListener('click', () => {
-    if (isRecording || iosKeyboardDictationMode) {
-      if (iosKeyboardDictationMode) {
-        applySemicolonFormattingToField(true);
-      }
-      stopMic(false);
+  micBtn?.addEventListener('click', async () => {
+    if (isRecording) {
+      stopMic();
       showToast('Aufnahme beendet ✓');
       return;
     }
-    /* On iOS Standalone PWA (Home-Screen app), Apple's WebKit silently drops webkitSpeechRecognition results -> go directly to Keyboard Dictation with live auto-semicolon formatting! */
-    if (!SpeechRec || (isIOS && isStandalonePWA())) {
-      enterIosKeyboardDictationMode();
+
+    if (!SpeechRec) {
+      area.focus();
+      showToast('Spracherkennung in diesem Browser nicht verfügbar – bitte Tastatur-Mikrofon nutzen');
       return;
     }
+
+    /* Blur textarea so iOS keyboard does NOT pop up and steal audio focus from SpeechRecognition! */
+    try { area.blur(); } catch {}
+
+    /* Cleanly stop any stale instance synchronously (no await!) */
+    if (activeRecognition) {
+      try {
+        activeRecognition.onresult = null;
+        activeRecognition.onend = null;
+        activeRecognition.onerror = null;
+        activeRecognition.stop();
+      } catch {}
+      activeRecognition = null;
+    }
+
     const existing = area.value.trim();
     sessionTranscriptBase = existing ? (existing.endsWith('\n') ? existing : existing.replace(/[;,]+\s*$/, '') + '; ') : '';
     sessionFinalText = sessionTranscriptBase;
     sessionInterimText = '';
     sessionSegments = [];
-    micStartedAt = Date.now();
     isRecording = true;
-    micBtn.classList.add('recording');
-    showToast('🎤 Ich höre zu… (erneut tippen zum Stoppen)');
+    setMicRecordingUI(true);
+    showToast('🎤 Sprich jetzt… (erneut tippen zum Stoppen)');
+
+    /* CRITICAL FOR iOS / SAFARI (exact Notizen-App pattern):
+       1) Call SpeechRecognition.start() SYNCHRONOUSLY inside the user's tap gesture BEFORE any await! */
     startFreshMemoRecognitionSession();
-  });
 
-  area.addEventListener('compositionstart', () => {
-    isComposing = true;
-    clearTimeout(dictationPauseTimer);
-  });
-
-  area.addEventListener('compositionend', () => {
-    isComposing = false;
-    if (iosKeyboardDictationMode) {
-      clearTimeout(dictationPauseTimer);
-      dictationPauseTimer = setTimeout(() => {
-        if (iosKeyboardDictationMode && !isComposing) {
-          applySemicolonFormattingToField(true);
+    /* 2) Also activate iOS AVAudioSession & microphone permission via getUserMedia (NO AudioContext on iOS!) */
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+        if (!isRecording) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
         }
-      }, 800);
+        micMediaStream = stream;
+      } catch (err) {
+        console.warn('Board mic getUserMedia error:', err);
+        if (err && err.name === 'NotAllowedError') {
+          stopMic();
+          showToast('Mikrofonzugriff nicht erlaubt – bitte in iOS Einstellungen erlauben');
+        }
+      }
     }
   });
 
@@ -1720,27 +1697,9 @@ function initScratchpad() {
     if (doneBtn) doneBtn.hidden = false;
   });
 
-  area.addEventListener('input', (e) => {
-    persistMemo();
-    /* In iOS Keyboard Dictation Mode, automatically format & append "; " after a short pause (800ms), never while deleting */
-    if (iosKeyboardDictationMode && !isComposing) {
-      const inputType = e?.inputType || '';
-      clearTimeout(dictationPauseTimer);
-      if (!inputType.startsWith('delete')) {
-        dictationPauseTimer = setTimeout(() => {
-          if (iosKeyboardDictationMode && !isComposing) {
-            applySemicolonFormattingToField(true);
-          }
-        }, 800);
-      }
-    }
-  });
+  area.addEventListener('input', persistMemo);
 
   area.addEventListener('blur', () => {
-    if (iosKeyboardDictationMode) {
-      applySemicolonFormattingToField(true);
-      stopMic(false);
-    }
     setTimeout(() => {
       if (doneBtn) doneBtn.hidden = true;
       resetMobileViewportZoom();
@@ -1748,10 +1707,7 @@ function initScratchpad() {
   });
 
   doneBtn?.addEventListener('click', () => {
-    if (iosKeyboardDictationMode) {
-      applySemicolonFormattingToField(true);
-    }
-    stopMic(false);
+    stopMic();
     area.blur();
     resetMobileViewportZoom();
     showToast('Memo gespeichert ✓');
@@ -1760,10 +1716,7 @@ function initScratchpad() {
   /* Silent transfer into Notizen app (dringend / JUH / privat) + clear scratchpad */
   transferBtns.forEach((btn) => {
     btn.addEventListener('click', async () => {
-      if (iosKeyboardDictationMode) {
-        applySemicolonFormattingToField(false);
-      }
-      stopMic(false);
+      stopMic();
       const memoText = area.value.trim();
       const cat = btn.dataset.memoCat;
       if (!memoText) {

@@ -1,5 +1,5 @@
 {
-  "version": "1.9.4",
+  "version": "1.9.5",
   "date": "2026-11-19",
-  "notes": "Fix für iPhone-PWA-Diktat im Schnell-Memo: Text landet zuverlässig im Feld inkl. automatischem '; '"
+  "notes": "Schnell-Memo-Mikrofon 1:1 mit Notizen-App iOS-Sprachengine (direkte Aufnahme + '; ', ohne Tastatur-Umweg)"
 }
