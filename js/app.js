@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.9.9';
+const APP_VERSION = '1.9.10';
 const APP_BUILD_DATE = '19.11.2026';
 
 const APPS = [
@@ -1269,7 +1269,7 @@ function initScratchpad() {
   const area = document.getElementById('quick-scratchpad');
   const status = document.getElementById('scratchpad-status');
   const doneBtn = document.getElementById('scratchpad-done-btn');
-  const micFrame = document.getElementById('scratchpad-mic-frame');
+  const micBtn = document.getElementById('scratchpad-mic-btn');
   const openNotizenBtn = document.getElementById('scratchpad-open-notizen');
   const transferBtns = document.querySelectorAll('[data-memo-cat]');
   const bridgeFrame = document.getElementById('notizen-bridge-iframe');
@@ -1324,12 +1324,109 @@ function initScratchpad() {
     if (!document.hidden) pingNotizen();
   });
 
-  /* Champions-League Isolated Microphone Iframe Bridge (Self-recycling 28x28px same-origin iframe:
-     gives iOS a 100% fresh Document + SFSpeechRecognizer on EVERY dictation without reloading the Board!) */
+  /* Champions-League Microphone Dictation (Exact Proven v1.9.6 / Remembers Recipe:
+     Top-level sync SpeechRecognition + getUserMedia + rec.stop() [NEVER abort()!] + 250ms iOS Seamless Session Reset) */
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let activeRecognition = null;
+  let micMediaStream = null;
   let isRecording = false;
+  let usedMicThisSession = false;
+  let micRestartTimer = null;
+  let sessionTranscriptBase = '';
+  let sessionSegments = [];
+  let sessionFinalText = '';
+  let sessionInterimText = '';
+
+  /* Restore scroll & toast seamlessly after an iOS audio/speech session reset */
+  try {
+    const savedScrollY = sessionStorage.getItem('board_scroll_y');
+    if (savedScrollY !== null) {
+      sessionStorage.removeItem('board_scroll_y');
+      requestAnimationFrame(() => window.scrollTo(0, parseInt(savedScrollY, 10) || 0));
+    }
+    const savedToast = sessionStorage.getItem('board_pending_toast');
+    if (savedToast) {
+      sessionStorage.removeItem('board_pending_toast');
+      setTimeout(() => showToast(savedToast), 120);
+    }
+  } catch {}
+
+  function triggerBoardSeamlessReload(toastMessage = '', delayMs = 250) {
+    try {
+      sessionStorage.setItem('board_scroll_y', String(window.scrollY || 0));
+      if (toastMessage) {
+        sessionStorage.setItem('board_pending_toast', toastMessage);
+      }
+      if (area.value) localStorage.setItem('dashboard_scratchpad', area.value);
+      else localStorage.removeItem('dashboard_scratchpad');
+    } catch {}
+    setTimeout(() => {
+      window.location.reload();
+    }, delayMs);
+  }
+
+  const MEMO_NUMBER_WORDS_DE = {
+    ein: '1', eine: '1', einen: '1', eins: '1',
+    zwei: '2', zwo: '2', drei: '3', vier: '4', fünf: '5',
+    sechs: '6', sieben: '7', acht: '8', neun: '9', zehn: '10',
+    elf: '11', zwölf: '12', fünfzehn: '15', zwanzig: '20'
+  };
+
+  const MEMO_RD_TERMS = {
+    'vigo': 'Viggo', 'vigos': 'Viggos', 'viggo': 'Viggo',
+    'rtw': 'RTW', 'nef': 'NEF', 'ktw': 'KTW', 'juh': 'JUH', 'rd': 'RD',
+    'ekg': 'EKG', 'elektroden': 'EKG-Elektroden', 'nacl': 'NaCl 0,9%',
+    'jonosteril': 'Jonosteril', 'ringer': 'Ringer', 'mullbinde': 'Mullbinde',
+    'mullbinden': 'Mullbinden', 'kompresse': 'Kompresse', 'kompressen': 'Kompressen',
+    'laken': 'Laken', 'decke': 'Decke', 'decken': 'Decken'
+  };
+
+  function formatMemoSpeechText(rawText) {
+    if (!rawText) return '';
+    let text = String(rawText);
+
+    text = text.replace(/\b(?:neue\s+)?zeile\b/gi, '\n');
+    text = text.replace(/\b(?:neuer\s+)?absatz\b/gi, '\n\n');
+    text = text.replace(/\b(?:semikolon|strichpunkt)\b/gi, '; ');
+
+    const UNIT_LOOKAHEAD = '(?:cm|mm|m|km|ml|l|dl|cl|mg|g|kg|µg|mcg|ug|ie|i\\.e\\.|iu|ch|charri[eè]re|gauge|zoll|uhr|min|sek|std|h|grad|prozent|%|bar|mmhg|mmol|liter|milliliter|gramm|milligramm|mikrogramm|zentimeter|millimeter|meter|er|te|ten|ter)\\b';
+
+    text = text.replace(/\b(ein|eine|einen|eins|zwei|zwo|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|fünfzehn|zwanzig)[ \t]*(?:mal|[xX×*])\b/gi, (m, numWord) => {
+      const digit = MEMO_NUMBER_WORDS_DE[numWord.toLowerCase()] || numWord;
+      return `${digit} x`;
+    });
+    text = text.replace(/\b(\d+)[ \t]*(?:mal|[xX×*])\b(?=[ \t]*[A-Za-zÄÖÜäöüß])/gi, '$1 x');
+    text = text.replace(new RegExp(`\\b(ein|eine|einen|eins|zwei|zwo|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|fünfzehn|zwanzig)[ \\t]+(?=${UNIT_LOOKAHEAD})`, 'gi'), (m, numWord) => {
+      const digit = MEMO_NUMBER_WORDS_DE[numWord.toLowerCase()] || numWord;
+      return `${digit} `;
+    });
+    text = text.replace(new RegExp(`\\b(ein|eine|einen|eins|zwei|zwo|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|fünfzehn|zwanzig)[ \\t]+(?!x\\b|mal\\b|${UNIT_LOOKAHEAD})(?=[A-ZÄÖÜa-zäöüß]{2,})`, 'gi'), (m, numWord) => {
+      const digit = MEMO_NUMBER_WORDS_DE[numWord.toLowerCase()] || numWord;
+      return `${digit} x `;
+    });
+
+    for (const [wrong, correct] of Object.entries(MEMO_RD_TERMS)) {
+      const esc = wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      text = text.replace(new RegExp(`(?<![\\wÄÖÜäöüß])${esc}(?![\\wÄÖÜäöüß])`, 'gi'), correct);
+    }
+
+    text = text.replace(/\b(\d+)[ \t]*(?:(?:[xX×*]|mal)[ \t]*)+(?=[A-Za-zÄÖÜäöüß])/gi, '$1 x ');
+    text = text.replace(new RegExp(`\\b(\\d+)[ \\t]+(?!(?:[xX×*]|mal)\\b|${UNIT_LOOKAHEAD})([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]{1,})`, 'gi'), '$1 x $2');
+    text = text.replace(/\b(\d+)[ \t]*(?:[xX×*][ \t]*){2,}/g, '$1 x ');
+    text = text.replace(/\bEKG\s+EKG-Elektroden\b/gi, 'EKG-Elektroden');
+    text = text.replace(/\bNaCl(?:\s+0,9%){2,}/gi, 'NaCl 0,9%');
+    text = text.replace(new RegExp(`\\b(\\d+(?:[.,]\\d+)?)[ \\t]*(?:[xX×*]|mal)[ \\t]*(?=${UNIT_LOOKAHEAD})`, 'gi'), '$1 ');
+    text = text.replace(new RegExp(`(?<!\\bmal)([A-Za-zÄÖÜäöüß]{2,}|%)[ \\t]*(?:,|;|\\bund\\b)?[ \\t]+(?=\\d+[ \\t]*(?:x[ \\t]+[A-Za-zÄÖÜäöüß0-9]|${UNIT_LOOKAHEAD}[ \\t]+[A-Za-zÄÖÜäöüß]{2,}))`, 'gi'), '$1; ');
+
+    text = text.replace(/[ \t]*;[ \t]*/g, '; ');
+    text = text.replace(/(?:;\s*){2,}/g, '; ');
+    text = text.replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n');
+    return text;
+  }
 
   function setMicRecordingUI(active) {
-    isRecording = active;
+    micBtn?.classList.toggle('recording', active);
     area.classList.toggle('mic-listening', active);
     if (openNotizenBtn) openNotizenBtn.hidden = active;
     if (status) {
@@ -1343,42 +1440,283 @@ function initScratchpad() {
     }
   }
 
-  function stopMic() {
-    try {
-      micFrame?.contentWindow?.__stopBoardSpeechMic?.();
-    } catch {}
-    if (isRecording) {
-      setMicRecordingUI(false);
+  function rebuildMemoFromSession() {
+    let combined = (sessionTranscriptBase || '').trim();
+    for (let idx = 0; idx < sessionSegments.length; idx++) {
+      const seg = sessionSegments[idx];
+      if (!seg || !seg.text) continue;
+      let segText = seg.text.trim();
+      const prevSeg = idx > 0 ? sessionSegments[idx - 1] : null;
+      if (prevSeg && prevSeg.text) {
+        const prevText = prevSeg.text.trim();
+        if (segText.toLowerCase() === prevText.toLowerCase()) continue;
+        if (segText.toLowerCase().startsWith(prevText.toLowerCase())) {
+          segText = segText.slice(prevText.length).replace(/^[;,\s]+/, '').trim();
+          if (!segText) continue;
+        }
+      }
+      segText = segText.replace(/[;,]+\s*$/, '').trim();
+      if (!segText) continue;
+
+      if (combined === '') {
+        combined = segText;
+      } else if (segText.startsWith('\n') || combined.endsWith('\n')) {
+        combined += segText;
+      } else {
+        combined = combined.replace(/[;,]+\s*$/, '') + '; ' + segText;
+      }
+    }
+    if (combined && !combined.endsWith('\n')) {
+      combined = combined.replace(/[;,]+\s*$/, '') + '; ';
+    }
+    sessionFinalText = combined;
+  }
+
+  function syncMemoFieldFromSpeech() {
+    const finalPart = sessionFinalText || '';
+    const interimPart = sessionInterimText || '';
+    let value = finalPart;
+    if (interimPart) {
+      if (!value) {
+        value = interimPart;
+      } else if (value.endsWith('\n') || value.endsWith('; ') || value.endsWith(' ')) {
+        value += interimPart;
+      } else {
+        value = value.replace(/[;,]+\s*$/, '') + '; ' + interimPart;
+      }
+    }
+    area.value = value;
+    localStorage.setItem('dashboard_scratchpad', area.value);
+    updateTransferButtonState();
+    autoResizeMemoField();
+    area.scrollTop = area.scrollHeight;
+  }
+
+  function flushInterimToFinal() {
+    if (sessionInterimText && sessionInterimText.trim()) {
+      const flushed = formatMemoSpeechText(sessionInterimText.trim()).replace(/[;,]+\s*$/, '').trim();
+      const cleanFinal = sessionFinalText.replace(/[;,]+\s*$/, '').trim();
+      if (flushed && !cleanFinal.toLowerCase().endsWith(flushed.toLowerCase())) {
+        const prefix = (sessionFinalText === '' || sessionFinalText.endsWith('\n') || sessionFinalText.endsWith('; ')) ? '' : '; ';
+        sessionFinalText += prefix + flushed + '; ';
+      }
+      sessionInterimText = '';
     }
   }
 
-  window.__boardSpeechBridge = {
-    getBaseText() {
-      try { area.blur(); } catch {}
-      return area.value || '';
-    },
-    onText(value) {
-      area.value = value;
-      localStorage.setItem('dashboard_scratchpad', area.value);
-      updateTransferButtonState();
-      autoResizeMemoField();
-      area.scrollTop = area.scrollHeight;
-    },
-    onState(active, toastMsg = '') {
-      setMicRecordingUI(active);
-      if (!active) {
-        persistMemo();
+  function releaseMicStream() {
+    if (micMediaStream) {
+      try { micMediaStream.getTracks().forEach((t) => t.stop()); } catch {}
+      micMediaStream = null;
+    }
+  }
+
+  function stopMic() {
+    clearTimeout(micRestartTimer);
+    micRestartTimer = null;
+    if (!isRecording && !activeRecognition && !micMediaStream) return;
+    isRecording = false;
+    setMicRecordingUI(false);
+
+    flushInterimToFinal();
+
+    if (activeRecognition) {
+      const rec = activeRecognition;
+      activeRecognition = null;
+      try {
+        rec.onresult = null;
+        rec.onend = null;
+        rec.onerror = null;
+        /* CRITICAL FOR iOS (proven in Remembers): Always use rec.stop(), NEVER rec.abort()! */
+        rec.stop();
+      } catch {}
+    }
+
+    releaseMicStream();
+
+    if (sessionFinalText) {
+      syncMemoFieldFromSpeech();
+      persistMemo();
+    }
+  }
+
+  function startFreshMemoRecognitionSession() {
+    clearTimeout(micRestartTimer);
+    if (!isRecording || !SpeechRec) return;
+
+    const rec = new SpeechRec();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'de-DE';
+    activeRecognition = rec;
+
+    let lastResultEventTime = Date.now();
+
+    const applyPauseSplittingToSegment = (segObj, rawTranscript, now) => {
+      const trimmedRaw = rawTranscript.trim();
+      if (!trimmedRaw) return '';
+      if (!segObj.rawHistory) {
+        segObj.rawHistory = trimmedRaw;
+        segObj.withPauses = trimmedRaw;
+        return trimmedRaw;
       }
-      if (toastMsg) showToast(toastMsg);
-    },
-    onToast(msg) {
-      if (msg) showToast(msg);
-    },
-    onUnsupported() {
+      const prevRaw = segObj.rawHistory;
+      if (trimmedRaw.toLowerCase() === prevRaw.toLowerCase()) {
+        return segObj.withPauses || trimmedRaw;
+      }
+      if (trimmedRaw.toLowerCase().startsWith(prevRaw.toLowerCase())) {
+        const addedPart = trimmedRaw.slice(prevRaw.length).trim();
+        if (addedPart) {
+          const pauseDuration = now - lastResultEventTime;
+          const baseWithPauses = (segObj.withPauses || prevRaw).replace(/[;,]+\s*$/, '').trim();
+          segObj.withPauses = pauseDuration > 1150
+            ? `${baseWithPauses}; ${addedPart}`
+            : `${baseWithPauses} ${addedPart}`;
+          segObj.rawHistory = trimmedRaw;
+          return segObj.withPauses;
+        }
+      }
+      segObj.rawHistory = trimmedRaw;
+      segObj.withPauses = trimmedRaw;
+      return trimmedRaw;
+    };
+
+    rec.onresult = (event) => {
+      const now = Date.now();
+      const currentInterimParts = [];
+
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i];
+        const bestTranscript = result[0].transcript;
+        const existing = sessionSegments[i] || { text: '', rawHistory: '', withPauses: '' };
+        const pausedText = applyPauseSplittingToSegment(existing, bestTranscript, now);
+
+        if (result.isFinal) {
+          sessionSegments[i] = { ...existing, text: formatMemoSpeechText(pausedText) };
+        } else {
+          sessionSegments[i] = { ...existing, text: '' };
+          currentInterimParts.push(pausedText);
+        }
+      }
+
+      lastResultEventTime = now;
+      rebuildMemoFromSession();
+
+      const rawInterimCombined = currentInterimParts.join('; ').trim();
+      const processedInterim = rawInterimCombined
+        ? formatMemoSpeechText(rawInterimCombined).replace(/[;,]+\s*$/, '').trim()
+        : '';
+
+      const cleanInterim = processedInterim.replace(/[;,]+\s*$/, '').trim();
+      const cleanFinal = sessionFinalText.replace(/[;,]+\s*$/, '').trim();
+      if (cleanInterim && cleanFinal.toLowerCase().endsWith(cleanInterim.toLowerCase())) {
+        sessionInterimText = '';
+      } else {
+        sessionInterimText = processedInterim;
+      }
+
+      syncMemoFieldFromSpeech();
+    };
+
+    rec.onerror = (event) => {
+      const errCode = event?.error || '';
+      if (errCode === 'no-speech' || errCode === 'aborted') return;
+      console.warn('Memo speech recognition warning:', errCode);
+      if (errCode === 'not-allowed' || errCode === 'service-not-allowed') {
+        stopMic();
+        showToast('Mikrofonzugriff bitte erlauben (Safari/iOS Einstellungen)');
+      }
+    };
+
+    rec.onend = () => {
+      if (activeRecognition !== rec) return;
+      activeRecognition = null;
+      if (isRecording) {
+        flushInterimToFinal();
+        sessionTranscriptBase = sessionFinalText;
+        sessionSegments = [];
+        syncMemoFieldFromSpeech();
+        micRestartTimer = setTimeout(() => {
+          if (isRecording) startFreshMemoRecognitionSession();
+        }, 100);
+      }
+    };
+
+    try {
+      rec.start();
+    } catch (e) {
+      console.warn('Could not start SpeechRecognition synchronously:', e);
+    }
+  }
+
+  micBtn?.addEventListener('click', async () => {
+    if (isRecording) {
+      stopMic();
+      if (isIOS && navigator.onLine) {
+        /* Exact Remembers pattern: after rec.stop() + track release, wait 250ms then seamless reload so iOS resets AVAudioSession & SFSpeechRecognizer cleanly! */
+        triggerBoardSeamlessReload('Aufnahme beendet ✓', 250);
+        return;
+      }
+      showToast('Aufnahme beendet ✓');
+      return;
+    }
+
+    if (!SpeechRec) {
       area.focus();
       showToast('Spracherkennung in diesem Browser nicht verfügbar – bitte Tastatur-Mikrofon nutzen');
+      return;
     }
-  };
+
+    try { area.blur(); } catch {}
+
+    if (activeRecognition) {
+      try {
+        activeRecognition.onresult = null;
+        activeRecognition.onend = null;
+        activeRecognition.onerror = null;
+        activeRecognition.stop();
+      } catch {}
+      activeRecognition = null;
+    }
+
+    const existing = area.value.trim();
+    sessionTranscriptBase = existing ? (existing.endsWith('\n') ? existing : existing.replace(/[;,]+\s*$/, '') + '; ') : '';
+    sessionFinalText = sessionTranscriptBase;
+    sessionInterimText = '';
+    sessionSegments = [];
+    isRecording = true;
+    usedMicThisSession = true;
+    setMicRecordingUI(true);
+    showToast('🎤 Sprich jetzt… (erneut tippen zum Stoppen)');
+
+    /* 1:1 proven v1.9.6 & Remembers pattern:
+       1) Synchronous SpeechRecognition.start() inside user tap BEFORE any await! */
+    startFreshMemoRecognitionSession();
+
+    /* 2) Activate iOS AVAudioSession & mic stream via getUserMedia (NO AudioContext on iOS!) */
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+        if (!isRecording) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        micMediaStream = stream;
+      } catch (err) {
+        console.warn('Board mic getUserMedia error:', err);
+        if (err && err.name === 'NotAllowedError') {
+          stopMic();
+          showToast('Mikrofonzugriff nicht erlaubt – bitte in iOS Einstellungen erlauben');
+        }
+      }
+    }
+  });
 
   area.addEventListener('focus', () => {
     if (doneBtn) doneBtn.hidden = false;
@@ -1406,6 +1744,7 @@ function initScratchpad() {
   /* Silent transfer into Notizen app (dringend / JUH / privat) + clear scratchpad */
   transferBtns.forEach((btn) => {
     btn.addEventListener('click', async () => {
+      const hadUsedMic = isRecording || usedMicThisSession;
       stopMic();
       const memoText = area.value.trim();
       const cat = btn.dataset.memoCat;
@@ -1423,6 +1762,10 @@ function initScratchpad() {
       btn.innerHTML = origHtml;
       if (res && res.ok) {
         area.value = '';
+        sessionTranscriptBase = '';
+        sessionFinalText = '';
+        sessionInterimText = '';
+        sessionSegments = [];
         autoResizeMemoField();
         localStorage.removeItem('dashboard_scratchpad');
         area.blur();
@@ -1431,9 +1774,14 @@ function initScratchpad() {
         try { localStorage.setItem('dashboard_notizen_has_notes', 'true'); } catch {}
         renderAppsGrid();
         const label = res.categoryLabel || cat;
-        showToast(res.appended
+        const msg = res.appended
           ? `An bestehende ${label}-Notiz angehängt ✓`
-          : `In Remembers (${label}) übertragen ✓`);
+          : `In Remembers (${label}) übertragen ✓`;
+        if (isIOS && hadUsedMic && navigator.onLine) {
+          triggerBoardSeamlessReload(msg, 120);
+          return;
+        }
+        showToast(msg);
       } else {
         showToast(`Fehler beim Übertragen: ${res?.error || 'Bitte kurz warten & erneut tippen'}`);
       }
@@ -1560,10 +1908,11 @@ function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return;
 
-  navigator.serviceWorker.register('sw.js').then((reg) => {
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
+    /* Quietly activate any waiting SW in the background — only version.json comparison decides if the Update Banner should show! */
     if (reg.waiting) {
       waitingServiceWorker = reg.waiting;
-      showUpdateAvailableBanner('', 'Update bereit');
+      try { reg.waiting.postMessage('skipWaiting'); } catch {}
     }
     reg.addEventListener('updatefound', () => {
       const installing = reg.installing;
@@ -1571,7 +1920,7 @@ function registerServiceWorker() {
       installing.addEventListener('statechange', () => {
         if (installing.state === 'installed' && navigator.serviceWorker.controller) {
           waitingServiceWorker = installing;
-          showUpdateAvailableBanner('', 'Update bereit');
+          try { installing.postMessage('skipWaiting'); } catch {}
         }
       });
     });
@@ -1613,8 +1962,9 @@ function initVersionDisplayAndUpdateCheck() {
       if (data.version && isVersionNewer(data.version, APP_VERSION)) {
         showUpdateAvailableBanner(data.version, data.notes || '');
         if (manual) showToast(`Neue Version v${data.version} verfügbar!`);
-      } else if (manual) {
-        showToast(`Board v${APP_VERSION} ist auf dem neuesten Stand ✓`);
+      } else {
+        if (updateBanner) updateBanner.hidden = true;
+        if (manual) showToast(`Board v${APP_VERSION} ist auf dem neuesten Stand ✓`);
       }
     } catch (e) {
       if (manual) showToast(`Installierte Version: v${APP_VERSION}`);

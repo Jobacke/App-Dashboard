@@ -1,5 +1,5 @@
 {
-  "version": "1.9.9",
+  "version": "1.9.10",
   "date": "2026-11-19",
-  "notes": "Eigenständiger selbst-recycelnder Mikrofon-Frame (1:1 Remembers-Prinzip): beliebig viele Diktate direkt hintereinander ohne Board-Reload"
+  "notes": "Bewährte v1.9.6-Sprachengine (rec.stop + getUserMedia) + sauberer 250ms-Reset für Mehrfach-Diktate + Update-Banner-Fix"
 }

@@ -1,8 +1,7 @@
-const CACHE_NAME = 'app-dashboard-v1.9.9';
+const CACHE_NAME = 'app-dashboard-v1.9.10';
 const ASSETS = [
   './',
   './index.html',
-  './speech-mic.html',
   './version.json',
   './css/style.css',
   './js/app.js',
@@ -25,6 +24,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {

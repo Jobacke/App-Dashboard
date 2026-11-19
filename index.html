@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Board" />
-  <link rel="manifest" href="manifest.webmanifest?v=28" />
+  <link rel="manifest" href="manifest.webmanifest?v=29" />
   <link rel="icon" type="image/svg+xml" href="icons/dashboard.svg" />
   <link rel="alternate icon" type="image/png" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2" />
@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=28" />
+  <link rel="stylesheet" href="css/style.css?v=29" />
   <script>
     try {
       const savedTheme = localStorage.getItem('dashboard_theme') || 'dark';
@@ -47,7 +47,7 @@
         <div class="brand-text">
           <div class="brand-title-row">
             <span class="brand-title">Board</span>
-            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v1.9.9</span>
+            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v1.9.10</span>
           </div>
           <span class="brand-subtitle">vjbackhaus.de Ecosystem</span>
         </div>
@@ -149,7 +149,14 @@
             <span class="scratchpad-title-wrap" title="Kurznotiz" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="scratchpad-icon"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
             </span>
-            <iframe id="scratchpad-mic-frame" class="scratchpad-mic-frame" src="speech-mic.html?v=28" title="Kurznotiz per Sprache diktieren" allow="microphone *"></iframe>
+            <button type="button" class="scratchpad-mic-btn" id="scratchpad-mic-btn" title="Kurznotiz per Sprache diktieren" aria-label="Kurznotiz per Sprache diktieren">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+            </button>
             <div class="memo-transfer-btns">
               <button type="button" class="memo-cat-btn cat-dringend" data-memo-cat="Dringend" title="In Rubrik 'Dringend' speichern & Feld leeren">
                 <span class="memo-cat-dot"></span> dringend
@@ -181,7 +188,7 @@
 
     <!-- App Footer with Version & Build Info -->
     <footer class="dashboard-footer">
-      <span>Board · <strong id="footer-version">v1.9.9</strong></span>
+      <span>Board · <strong id="footer-version">v1.9.10</strong></span>
       <span>·</span>
       <span id="footer-date">Stand 19.11.2026</span>
       <span>·</span>
@@ -254,6 +261,6 @@
   <!-- Toast Notification -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
-  <script src="js/app.js?v=28"></script>
+  <script src="js/app.js?v=29"></script>
 </body>
 </html>
