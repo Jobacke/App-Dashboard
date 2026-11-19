@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Board" />
-  <link rel="manifest" href="manifest.webmanifest?v=19" />
+  <link rel="manifest" href="manifest.webmanifest?v=20" />
   <link rel="icon" type="image/svg+xml" href="icons/dashboard.svg" />
   <link rel="alternate icon" type="image/png" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2" />
@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=19" />
+  <link rel="stylesheet" href="css/style.css?v=20" />
   <script>
     try {
       const savedTheme = localStorage.getItem('dashboard_theme') || 'dark';
@@ -47,7 +47,7 @@
         <div class="brand-text">
           <div class="brand-title-row">
             <span class="brand-title">Board</span>
-            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v1.9.0</span>
+            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v1.9.1</span>
           </div>
           <span class="brand-subtitle">vjbackhaus.de Ecosystem</span>
         </div>
@@ -160,7 +160,7 @@
               </svg>
             </button>
             <button type="button" class="scratchpad-save-btn" id="scratchpad-done-btn" hidden>Fertig ✓</button>
-            <a href="https://remembers.vjbackhaus.de/" target="_blank" rel="noopener" class="scratchpad-link" title="In Notizen-App öffnen">→ Notizen</a>
+            <button type="button" id="scratchpad-open-notizen" class="scratchpad-link" title="Notizen-App direkt im Board öffnen">→ Notizen</button>
           </div>
         </div>
         <textarea id="quick-scratchpad" class="scratchpad-input" rows="2" placeholder="Kurze Gedanken, Schicht-Notiz oder To-Do direkt hier festhalten…"></textarea>
@@ -190,7 +190,7 @@
 
     <!-- App Footer with Version & Build Info -->
     <footer class="dashboard-footer">
-      <span>Board · <strong id="footer-version">v1.9.0</strong></span>
+      <span>Board · <strong id="footer-version">v1.9.1</strong></span>
       <span>·</span>
       <span id="footer-date">Stand 19.11.2026</span>
       <span>·</span>
@@ -230,6 +230,14 @@
       </div>
     </div>
     <div class="cockpit-body">
+      <div class="cockpit-share-bar" id="cockpit-share-bar" hidden>
+        <span class="cockpit-share-label">Notiz zum Weiterleiten bereit</span>
+        <div class="cockpit-share-actions">
+          <button type="button" class="cockpit-share-primary" id="cockpit-share-trigger">Jetzt teilen ↗</button>
+          <button type="button" class="cockpit-share-secondary" id="cockpit-share-copy">Kopieren</button>
+          <button type="button" class="cockpit-share-close" id="cockpit-share-dismiss" aria-label="Schließen">✕</button>
+        </div>
+      </div>
       <div class="cockpit-loader" id="cockpit-loader">
         <div class="spinner"></div>
         <span>Lade Web-App…</span>
@@ -237,7 +245,7 @@
       <iframe id="cockpit-iframe"
               class="cockpit-iframe"
               title="Integrierte Web-App Ansicht"
-              allow="geolocation *; microphone *; camera *; clipboard-read *; clipboard-write *; fullscreen *; autoplay *; wake-lock *; bluetooth *"></iframe>
+              allow="geolocation *; microphone *; camera *; clipboard-read *; clipboard-write *; web-share *; fullscreen *; autoplay *; wake-lock *; bluetooth *"></iframe>
     </div>
   </aside>
   <div class="cockpit-backdrop" id="cockpit-backdrop" hidden></div>
@@ -255,6 +263,6 @@
   <!-- Toast Notification -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
-  <script src="js/app.js?v=19"></script>
+  <script src="js/app.js?v=20"></script>
 </body>
 </html>

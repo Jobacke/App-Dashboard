@@ -712,9 +712,15 @@ html[data-theme="light"] .icon-sun { display: none; }
 }
 
 .scratchpad-link {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  font-family: inherit;
+  cursor: pointer;
   color: var(--text-secondary);
   text-decoration: none;
   font-size: 0.76rem;
+  font-weight: 500;
   white-space: nowrap;
   flex-shrink: 0;
   transition: color 0.15s;
@@ -1853,6 +1859,81 @@ html[data-theme="light"] .quick-chip {
   position: relative;
   flex: 1;
   background: #0b0d13;
+}
+
+.cockpit-share-bar {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  right: 12px;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(16, 19, 28, 0.94);
+  border: 1px solid rgba(234, 179, 8, 0.45);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.cockpit-share-bar[hidden] {
+  display: none;
+}
+
+.cockpit-share-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #f8fafc;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cockpit-share-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cockpit-share-primary {
+  border: none;
+  border-radius: 9px;
+  padding: 7px 12px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #111827;
+  background: #facc15;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cockpit-share-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 9px;
+  padding: 7px 10px;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cockpit-share-close {
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.95rem;
+  padding: 4px 6px;
+  cursor: pointer;
 }
 
 .cockpit-iframe {

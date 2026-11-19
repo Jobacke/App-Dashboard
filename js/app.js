@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.9.1';
 const APP_BUILD_DATE = '19.11.2026';
 
 const APPS = [
@@ -903,6 +903,7 @@ function openCockpit(appId, customUrl = null) {
     drawer.setAttribute('aria-hidden', 'false');
   }
   if (backdrop) backdrop.hidden = false;
+  hideCockpitShareBar();
   renderDock();
 }
 
@@ -912,6 +913,7 @@ function closeCockpit() {
   const iframe = document.getElementById('cockpit-iframe');
 
   state.activeCockpitAppId = null;
+  hideCockpitShareBar();
   if (drawer) {
     drawer.classList.remove('open');
     drawer.setAttribute('aria-hidden', 'true');
@@ -921,10 +923,74 @@ function closeCockpit() {
   renderDock();
 }
 
+let pendingCockpitShare = null;
+
+function hideCockpitShareBar() {
+  pendingCockpitShare = null;
+  const bar = document.getElementById('cockpit-share-bar');
+  if (bar) bar.hidden = true;
+}
+
+function showCockpitShareBar(payload) {
+  pendingCockpitShare = payload;
+  const bar = document.getElementById('cockpit-share-bar');
+  if (bar) bar.hidden = false;
+}
+
+async function copyTextTopLevel(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {}
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 function initCockpitControls() {
   document.getElementById('cockpit-close')?.addEventListener('click', closeCockpit);
   document.getElementById('cockpit-back-board')?.addEventListener('click', closeCockpit);
   document.getElementById('cockpit-backdrop')?.addEventListener('click', closeCockpit);
+
+  document.getElementById('cockpit-share-dismiss')?.addEventListener('click', hideCockpitShareBar);
+  document.getElementById('cockpit-share-copy')?.addEventListener('click', async () => {
+    if (!pendingCockpitShare?.text) return;
+    const ok = await copyTextTopLevel(pendingCockpitShare.text);
+    showToast(ok ? 'Notiz in Zwischenablage kopiert ✓' : 'Kopieren nicht möglich');
+    if (ok) hideCockpitShareBar();
+  });
+  document.getElementById('cockpit-share-trigger')?.addEventListener('click', async () => {
+    if (!pendingCockpitShare?.text) return;
+    const payload = pendingCockpitShare;
+    if (navigator.share) {
+      try {
+        await navigator.share({ text: payload.text });
+        hideCockpitShareBar();
+        return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') {
+          hideCockpitShareBar();
+          return;
+        }
+      }
+    }
+    const ok = await copyTextTopLevel(payload.text);
+    showToast(ok ? 'Notiz in Zwischenablage kopiert ✓' : 'Teilen auf diesem Gerät nicht verfügbar');
+    hideCockpitShareBar();
+  });
 
   document.getElementById('cockpit-expand')?.addEventListener('click', () => {
     const drawer = document.getElementById('cockpit-drawer');
@@ -992,6 +1058,20 @@ function initCockpitControls() {
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
       );
+    } else if (e.data.type === 'board-share-text' && typeof e.data.text === 'string') {
+      const payload = { title: e.data.title || 'Notiz', text: e.data.text };
+      (async () => {
+        if (navigator.share) {
+          try {
+            await navigator.share({ text: payload.text });
+            return;
+          } catch (err) {
+            if (err && err.name === 'AbortError') return;
+          }
+        }
+        await copyTextTopLevel(payload.text);
+        showCockpitShareBar(payload);
+      })();
     } else if (e.data.type === 'notizen-status') {
       const hasNotes = Boolean(e.data.hasNotes);
       if (state.notizenHasNotes !== hasNotes) {
@@ -1098,9 +1178,15 @@ function initScratchpad() {
   const status = document.getElementById('scratchpad-status');
   const doneBtn = document.getElementById('scratchpad-done-btn');
   const micBtn = document.getElementById('scratchpad-mic-btn');
+  const openNotizenBtn = document.getElementById('scratchpad-open-notizen');
   const transferBtns = document.querySelectorAll('[data-memo-cat]');
   const bridgeFrame = document.getElementById('notizen-bridge-iframe');
   if (!area) return;
+
+  /* Open Notizen directly inside the Board Cockpit so transferred notes & JUH compositions are always visible */
+  openNotizenBtn?.addEventListener('click', () => {
+    openCockpit('notizen');
+  });
 
   area.value = localStorage.getItem('dashboard_scratchpad') || '';
   let timeoutId = null;
