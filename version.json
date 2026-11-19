@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0",
+  "version": "2.1.0",
   "date": "2026-11-19",
-  "notes": "Neue iPhone-feste Sprach-Engine mit MediaRecorder + Groq Whisper Large v3 (beliebig viele Diktate direkt hintereinander)"
+  "notes": "Live-Vorschau während des Diktierens (alle ~2,4 Sek. über Groq Whisper) + sauberer Final-Pass beim Stoppen"
 }

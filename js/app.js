@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 const APP_BUILD_DATE = '19.11.2026';
 
 const APPS = [
@@ -1346,7 +1346,15 @@ function initScratchpad() {
   let audioChunks = [];
   let isTranscribing = false;
   let recordTimerInterval = null;
+  let livePreviewInterval = null;
+  let livePreviewInFlight = false;
+  let livePreviewUnsupported = false;
+  let livePreviewAbortCtrl = null;
+  let lastPreviewSize = 0;
   let recordStartTime = 0;
+  let recordingSessionId = 0;
+  let baseTextBeforeRecording = '';
+  let currentRecordingMime = 'audio/mp4';
 
   function getGroqKey() {
     try { return (localStorage.getItem(GROQ_KEY_STORAGE) || '').trim(); } catch { return ''; }
@@ -1528,16 +1536,45 @@ function initScratchpad() {
     }
   }
 
+  function stopLivePreviewLoop() {
+    clearInterval(livePreviewInterval);
+    livePreviewInterval = null;
+    livePreviewInFlight = false;
+    if (livePreviewAbortCtrl) {
+      try { livePreviewAbortCtrl.abort(); } catch {}
+      livePreviewAbortCtrl = null;
+    }
+  }
+
   function releaseMicStream() {
     clearInterval(recordTimerInterval);
     recordTimerInterval = null;
+    stopLivePreviewLoop();
     if (micMediaStream) {
       try { micMediaStream.getTracks().forEach((t) => t.stop()); } catch {}
       micMediaStream = null;
     }
   }
 
-  async function transcribeAudioWithGroq(audioBlob) {
+  function applyRecognizedTextToField(cleanText, withTrailingSemicolon = true) {
+    const cleanNew = String(cleanText || '').replace(/[;,]+\s*$/, '').trim();
+    if (!cleanNew) return;
+    const suffix = withTrailingSemicolon ? '; ' : '';
+    if (baseTextBeforeRecording) {
+      const prefix = baseTextBeforeRecording.endsWith('\n')
+        ? baseTextBeforeRecording
+        : baseTextBeforeRecording.replace(/[;,]+\s*$/, '') + '; ';
+      area.value = `${prefix}${cleanNew}${suffix}`;
+    } else {
+      area.value = `${cleanNew}${suffix}`;
+    }
+    localStorage.setItem('dashboard_scratchpad', area.value);
+    updateTransferButtonState();
+    autoResizeMemoField();
+    area.scrollTop = area.scrollHeight;
+  }
+
+  async function transcribeAudioWithGroq(audioBlob, signal = null) {
     const apiKey = getGroqKey();
     if (!apiKey) return { ok: false, error: 'Kein Groq-API-Key hinterlegt' };
     if (!audioBlob || audioBlob.size < 400) return { ok: false, error: 'Aufnahme zu kurz' };
@@ -1559,17 +1596,20 @@ function initScratchpad() {
       'Rettungsdienst, JUH, Materialauffüllung, Notizen: Viggo, Viggos, Jonosteril, NaCl 0,9%, Ringer, Mullbinde, Mullbinden, 8 cm Mullbinde, Kompressen 10x10, Decke, Decken, Laken, EKG-Elektroden, Verbandpäckchen, Handschuhe, Pflaster, Spritze, Kanüle, RTW, NEF, KTW, ZNA. Begriffe mit Semikolon trennen: 2 x Decken; 3 x Laken; 8 cm Mullbinde;'
     );
 
-    const resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    const fetchOpts = {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}` },
       body: formData
-    });
+    };
+    if (signal) fetchOpts.signal = signal;
+
+    const resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', fetchOpts);
 
     if (!resp.ok) {
       if (resp.status === 401) {
-        return { ok: false, error: 'Groq-Key ungültig – bitte in den Einstellungen prüfen' };
+        return { ok: false, status: 401, error: 'Groq-Key ungültig – bitte in den Einstellungen prüfen' };
       }
-      return { ok: false, error: `Groq-Fehler (${resp.status})` };
+      return { ok: false, status: resp.status, error: `Groq-Fehler (${resp.status})` };
     }
 
     const data = await resp.json();
@@ -1597,6 +1637,39 @@ function initScratchpad() {
     return { ok: true, text: formatted };
   }
 
+  function startLivePreviewLoop(mySessionId) {
+    stopLivePreviewLoop();
+    livePreviewUnsupported = false;
+    lastPreviewSize = 0;
+
+    livePreviewInterval = setInterval(async () => {
+      if (!isRecording || mySessionId !== recordingSessionId || livePreviewInFlight || livePreviewUnsupported) return;
+      if (audioChunks.length < 4) return;
+
+      const snapBlob = new Blob(audioChunks.slice(), { type: currentRecordingMime });
+      if (snapBlob.size < 1200 || snapBlob.size === lastPreviewSize) return;
+      lastPreviewSize = snapBlob.size;
+
+      livePreviewInFlight = true;
+      livePreviewAbortCtrl = new AbortController();
+      try {
+        const res = await transcribeAudioWithGroq(snapBlob, livePreviewAbortCtrl.signal);
+        if (!isRecording || mySessionId !== recordingSessionId) return;
+        if (res.ok && res.text) {
+          applyRecognizedTextToField(res.text, false);
+        } else if (res.status === 400 || res.status === 415) {
+          /* Browser does not emit self-contained fragmented chunks mid-stream -> disable live probe silently and rely on final Stop pass */
+          livePreviewUnsupported = true;
+        }
+      } catch {
+        /* Aborted on stop or temporary hiccup — final Stop transcription handles everything cleanly */
+      } finally {
+        livePreviewInFlight = false;
+        livePreviewAbortCtrl = null;
+      }
+    }, 2400);
+  }
+
   function stopAndTranscribeRecording() {
     return new Promise((resolve) => {
       if (!isRecording || !mediaRecorder) {
@@ -1607,9 +1680,11 @@ function initScratchpad() {
         return;
       }
 
+      const mySessionId = recordingSessionId;
       isRecording = false;
       clearInterval(recordTimerInterval);
       recordTimerInterval = null;
+      stopLivePreviewLoop();
       const recorder = mediaRecorder;
       mediaRecorder = null;
 
@@ -1619,7 +1694,7 @@ function initScratchpad() {
         settled = true;
         releaseMicStream();
 
-        const mimeType = recorder.mimeType || (audioChunks[0] && audioChunks[0].type) || 'audio/mp4';
+        const mimeType = recorder.mimeType || (audioChunks[0] && audioChunks[0].type) || currentRecordingMime || 'audio/mp4';
         const blob = new Blob(audioChunks, { type: mimeType });
         audioChunks = [];
 
@@ -1628,17 +1703,13 @@ function initScratchpad() {
 
         try {
           const result = await transcribeAudioWithGroq(blob);
+          if (mySessionId !== recordingSessionId) {
+            resolve({ ok: false, skipped: true });
+            return;
+          }
           if (result.ok && result.text) {
-            const existing = area.value.trim();
-            const cleanNew = result.text.replace(/[;,]+\s*$/, '').trim();
-            if (existing) {
-              const prefix = existing.endsWith('\n') ? existing : existing.replace(/[;,]+\s*$/, '') + '; ';
-              area.value = `${prefix}${cleanNew}; `;
-            } else {
-              area.value = `${cleanNew}; `;
-            }
+            applyRecognizedTextToField(result.text, true);
             persistMemo();
-            area.scrollTop = area.scrollHeight;
             showToast('🎤 Text erkannt ✓');
             resolve({ ok: true, text: area.value });
           } else {
@@ -1702,6 +1773,8 @@ function initScratchpad() {
 
       micMediaStream = stream;
       audioChunks = [];
+      baseTextBeforeRecording = area.value.trim();
+      const mySessionId = ++recordingSessionId;
 
       const isIOSDevice = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       const preferredMimes = isIOSDevice
@@ -1717,6 +1790,7 @@ function initScratchpad() {
       }
 
       mediaRecorder = chosenMime ? new MediaRecorder(stream, { mimeType: chosenMime }) : new MediaRecorder(stream);
+      currentRecordingMime = mediaRecorder.mimeType || chosenMime || 'audio/mp4';
       mediaRecorder.ondataavailable = (ev) => {
         if (ev.data && ev.data.size > 0) {
           audioChunks.push(ev.data);
@@ -1728,6 +1802,8 @@ function initScratchpad() {
       recordStartTime = Date.now();
       setMicUIState('recording', '● 0:00');
       showToast('🎤 Sprich jetzt… (erneut tippen zum Stoppen)');
+
+      startLivePreviewLoop(mySessionId);
 
       recordTimerInterval = setInterval(() => {
         if (!isRecording) return;
