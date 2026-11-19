@@ -1,5 +1,5 @@
 {
-  "version": "1.9.2",
+  "version": "1.9.3",
   "date": "2026-11-19",
-  "notes": "iPhone PDF-Export über natives Teilen/Quick-Look + Cache-Refresh im Cockpit"
+  "notes": "Schnell-Memo-Mikrofon trennt Begriffe automatisch mit '; ' (wie in der Notizen-App)"
 }

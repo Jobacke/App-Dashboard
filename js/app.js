@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.9.2';
+const APP_VERSION = '1.9.3';
 const APP_BUILD_DATE = '19.11.2026';
 
 const APPS = [
@@ -1313,20 +1313,154 @@ function initScratchpad() {
     if (!document.hidden) pingNotizen();
   });
 
-  /* Champions-League Microphone Dictation (Live SpeechRecognition + iOS Standalone Fallback) */
+  /* Champions-League Microphone Dictation (Notizen-App Semicolon & Pause Engine + iOS Fallback) */
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-  let recognition = null;
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let activeRecognition = null;
   let isRecording = false;
-  let baseTextBeforeMic = '';
+  let sessionTranscriptBase = '';
+  let sessionSegments = [];
+  let sessionFinalText = '';
+  let sessionInterimText = '';
   let micStartedAt = 0;
+
+  const MEMO_NUMBER_WORDS_DE = {
+    ein: '1', eine: '1', einen: '1', eins: '1',
+    zwei: '2', zwo: '2', drei: '3', vier: '4', fünf: '5',
+    sechs: '6', sieben: '7', acht: '8', neun: '9', zehn: '10',
+    elf: '11', zwölf: '12', fünfzehn: '15', zwanzig: '20'
+  };
+
+  const MEMO_RD_TERMS = {
+    'vigo': 'Viggo', 'vigos': 'Viggos', 'viggo': 'Viggo',
+    'rtw': 'RTW', 'nef': 'NEF', 'ktw': 'KTW', 'juh': 'JUH', 'rd': 'RD',
+    'ekg': 'EKG', 'elektroden': 'EKG-Elektroden', 'nacl': 'NaCl 0,9%',
+    'jonosteril': 'Jonosteril', 'ringer': 'Ringer', 'mullbinde': 'Mullbinde',
+    'mullbinden': 'Mullbinden', 'kompresse': 'Kompresse', 'kompressen': 'Kompressen',
+    'laken': 'Laken', 'decke': 'Decke', 'decken': 'Decken'
+  };
+
+  function formatMemoSpeechText(rawText) {
+    if (!rawText) return '';
+    let text = String(rawText);
+
+    /* 1. Magic voice commands matching Notizen app */
+    text = text.replace(/\b(?:neue\s+)?zeile\b/gi, '\n');
+    text = text.replace(/\b(?:neuer\s+)?absatz\b/gi, '\n\n');
+    text = text.replace(/\b(?:semikolon|strichpunkt)\b/gi, '; ');
+
+    const UNIT_LOOKAHEAD = '(?:cm|mm|m|km|ml|l|dl|cl|mg|g|kg|µg|mcg|ug|ie|i\\.e\\.|iu|ch|charri[eè]re|gauge|zoll|uhr|min|sek|std|h|grad|prozent|%|bar|mmhg|mmol|liter|milliliter|gramm|milligramm|mikrogramm|zentimeter|millimeter|meter|er|te|ten|ter)\\b';
+
+    /* 2. Number words & multipliers ("zwei mal" / "fünf Decken" -> "2 x" / "5 x Decken", keeping "8 cm Mullbinde" without x) */
+    text = text.replace(/\b(ein|eine|einen|eins|zwei|zwo|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|fünfzehn|zwanzig)[ \t]*(?:mal|[xX×*])\b/gi, (m, numWord) => {
+      const digit = MEMO_NUMBER_WORDS_DE[numWord.toLowerCase()] || numWord;
+      return `${digit} x`;
+    });
+    text = text.replace(/\b(\d+)[ \t]*(?:mal|[xX×*])\b(?=[ \t]*[A-Za-zÄÖÜäöüß])/gi, '$1 x');
+    text = text.replace(new RegExp(`\\b(ein|eine|einen|eins|zwei|zwo|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|fünfzehn|zwanzig)[ \\t]+(?=${UNIT_LOOKAHEAD})`, 'gi'), (m, numWord) => {
+      const digit = MEMO_NUMBER_WORDS_DE[numWord.toLowerCase()] || numWord;
+      return `${digit} `;
+    });
+    text = text.replace(new RegExp(`\\b(ein|eine|einen|eins|zwei|zwo|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|fünfzehn|zwanzig)[ \\t]+(?!x\\b|mal\\b|${UNIT_LOOKAHEAD})(?=[A-ZÄÖÜa-zäöüß]{2,})`, 'gi'), (m, numWord) => {
+      const digit = MEMO_NUMBER_WORDS_DE[numWord.toLowerCase()] || numWord;
+      return `${digit} x `;
+    });
+
+    /* 3. Core RD term corrections */
+    for (const [wrong, correct] of Object.entries(MEMO_RD_TERMS)) {
+      const esc = wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      text = text.replace(new RegExp(`(?<![\\wÄÖÜäöüß])${esc}(?![\\wÄÖÜäöüß])`, 'gi'), correct);
+    }
+
+    /* 4. Normalize quantities & separate consecutive quantity items with "; " */
+    text = text.replace(/\b(\d+)[ \t]*(?:(?:[xX×*]|mal)[ \t]*)+(?=[A-Za-zÄÖÜäöüß])/gi, '$1 x ');
+    text = text.replace(new RegExp(`\\b(\\d+)[ \\t]+(?!(?:[xX×*]|mal)\\b|${UNIT_LOOKAHEAD})([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]{1,})`, 'gi'), '$1 x $2');
+    text = text.replace(/\b(\d+)[ \t]*(?:[xX×*][ \t]*){2,}/g, '$1 x ');
+    text = text.replace(/\bEKG\s+EKG-Elektroden\b/gi, 'EKG-Elektroden');
+    text = text.replace(new RegExp(`\\b(\\d+(?:[.,]\\d+)?)[ \\t]*(?:[xX×*]|mal)[ \\t]*(?=${UNIT_LOOKAHEAD})`, 'gi'), '$1 ');
+    text = text.replace(new RegExp(`(?<!\\bmal)([A-Za-zÄÖÜäöüß]{2,}|%)[ \\t]*(?:,|;|\\bund\\b)?[ \\t]+(?=\\d+[ \\t]*(?:x[ \\t]+[A-Za-zÄÖÜäöüß0-9]|${UNIT_LOOKAHEAD}[ \\t]+[A-Za-zÄÖÜäöüß]{2,}))`, 'gi'), '$1; ');
+
+    text = text.replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n').replace(/;\s*;/g, ';');
+    return text;
+  }
+
+  function rebuildMemoFromSession() {
+    let combined = (sessionTranscriptBase || '').trim();
+
+    for (let idx = 0; idx < sessionSegments.length; idx++) {
+      const seg = sessionSegments[idx];
+      if (!seg || !seg.text) continue;
+
+      let segText = seg.text.trim();
+      const prevSeg = idx > 0 ? sessionSegments[idx - 1] : null;
+      if (prevSeg && prevSeg.text) {
+        const prevText = prevSeg.text.trim();
+        if (segText.toLowerCase() === prevText.toLowerCase()) continue;
+        if (segText.toLowerCase().startsWith(prevText.toLowerCase())) {
+          segText = segText.slice(prevText.length).replace(/^[;,\s]+/, '').trim();
+          if (!segText) continue;
+        }
+      }
+
+      segText = segText.replace(/[;,]+\s*$/, '').trim();
+      if (!segText) continue;
+
+      if (combined === '') {
+        combined = segText;
+      } else if (segText.startsWith('\n') || combined.endsWith('\n')) {
+        combined += segText;
+      } else {
+        combined = combined.replace(/[;,]+\s*$/, '') + '; ' + segText;
+      }
+    }
+
+    if (combined && !combined.endsWith('\n')) {
+      combined = combined.replace(/[;,]+\s*$/, '') + '; ';
+    }
+
+    sessionFinalText = combined;
+  }
+
+  function syncMemoFieldFromSpeech() {
+    const finalPart = sessionFinalText || '';
+    const interimPart = sessionInterimText || '';
+    let value = finalPart;
+    if (interimPart) {
+      if (!value) {
+        value = interimPart;
+      } else if (value.endsWith('\n') || value.endsWith('; ') || value.endsWith(' ')) {
+        value += interimPart;
+      } else {
+        value = value.replace(/[;,]+\s*$/, '') + '; ' + interimPart;
+      }
+    }
+    area.value = value;
+    persistMemo();
+  }
+
+  function flushInterimToFinal() {
+    if (sessionInterimText && sessionInterimText.trim()) {
+      const flushed = formatMemoSpeechText(sessionInterimText.trim()).replace(/[;,]+\s*$/, '').trim();
+      const cleanFinal = sessionFinalText.replace(/[;,]+\s*$/, '').trim();
+      if (flushed && !cleanFinal.toLowerCase().endsWith(flushed.toLowerCase())) {
+        const prefix = (sessionFinalText === '' || sessionFinalText.endsWith('\n') || sessionFinalText.endsWith('; ')) ? '' : '; ';
+        sessionFinalText += prefix + flushed + '; ';
+      }
+      sessionInterimText = '';
+    }
+  }
 
   function stopMic() {
     isRecording = false;
     micBtn?.classList.remove('recording');
-    if (recognition) {
-      try { recognition.stop(); } catch {}
-      recognition = null;
+    if (activeRecognition) {
+      const rec = activeRecognition;
+      activeRecognition = null;
+      try { rec.stop(); } catch {}
+    }
+    flushInterimToFinal();
+    if (sessionFinalText) {
+      syncMemoFieldFromSpeech();
     }
   }
 
@@ -1336,64 +1470,169 @@ function initScratchpad() {
     showToast('🎤 Tippe unten rechts auf der Tastatur aufs Mikrofon zum Diktieren');
   }
 
+  function startFreshMemoRecognitionSession() {
+    if (!isRecording || !SpeechRec) return;
+
+    const rec = new SpeechRec();
+    rec.lang = 'de-DE';
+    rec.interimResults = true;
+    rec.continuous = true;
+    rec.maxAlternatives = 1;
+    activeRecognition = rec;
+
+    let lastResultEventTime = Date.now();
+
+    /* Exact same pause splitter as Notizen app: > 550ms pause between words inserts "; " */
+    const applyPauseSplittingToSegment = (segObj, rawTranscript, now) => {
+      const trimmedRaw = rawTranscript.trim();
+      if (!trimmedRaw) return '';
+
+      if (!segObj.rawHistory) {
+        segObj.rawHistory = trimmedRaw;
+        segObj.withPauses = trimmedRaw;
+        return trimmedRaw;
+      }
+
+      const prevRaw = segObj.rawHistory;
+      if (trimmedRaw.toLowerCase() === prevRaw.toLowerCase()) {
+        return segObj.withPauses || trimmedRaw;
+      }
+
+      if (trimmedRaw.toLowerCase().startsWith(prevRaw.toLowerCase())) {
+        const addedPart = trimmedRaw.slice(prevRaw.length).trim();
+        if (addedPart) {
+          const pauseDuration = now - lastResultEventTime;
+          const baseWithPauses = (segObj.withPauses || prevRaw).replace(/[;,]+\s*$/, '').trim();
+          segObj.withPauses = pauseDuration > 550
+            ? `${baseWithPauses}; ${addedPart}`
+            : `${baseWithPauses} ${addedPart}`;
+          segObj.rawHistory = trimmedRaw;
+          return segObj.withPauses;
+        }
+      }
+
+      segObj.rawHistory = trimmedRaw;
+      segObj.withPauses = trimmedRaw;
+      return trimmedRaw;
+    };
+
+    rec.onresult = (event) => {
+      const now = Date.now();
+      const currentInterimParts = [];
+
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i];
+        const bestTranscript = result[0].transcript;
+        const existing = sessionSegments[i] || {
+          text: '',
+          rawHistory: '',
+          withPauses: ''
+        };
+
+        const pausedText = applyPauseSplittingToSegment(existing, bestTranscript, now);
+
+        if (result.isFinal) {
+          sessionSegments[i] = {
+            ...existing,
+            text: formatMemoSpeechText(pausedText)
+          };
+        } else {
+          sessionSegments[i] = {
+            ...existing,
+            text: ''
+          };
+          currentInterimParts.push(pausedText);
+        }
+      }
+
+      lastResultEventTime = now;
+      rebuildMemoFromSession();
+
+      const rawInterimCombined = currentInterimParts.join('; ').trim();
+      const processedInterim = rawInterimCombined
+        ? formatMemoSpeechText(rawInterimCombined).replace(/[;,]+\s*$/, '').trim() + '; '
+        : '';
+
+      const cleanInterim = processedInterim.replace(/[;,]+\s*$/, '').trim();
+      const cleanFinal = sessionFinalText.replace(/[;,]+\s*$/, '').trim();
+      if (cleanInterim && cleanFinal.toLowerCase().endsWith(cleanInterim.toLowerCase())) {
+        sessionInterimText = '';
+      } else {
+        sessionInterimText = processedInterim;
+      }
+
+      syncMemoFieldFromSpeech();
+    };
+
+    rec.onerror = (event) => {
+      const errCode = event?.error || '';
+      if (errCode === 'no-speech' || errCode === 'aborted') return;
+      stopMic();
+      if (isIOS) {
+        focusForIosKeyboardDictation();
+      } else {
+        showToast('Mikrofon nicht verfügbar – bitte Berechtigung prüfen');
+      }
+    };
+
+    rec.onend = () => {
+      const elapsed = Date.now() - micStartedAt;
+      if (activeRecognition !== rec) return;
+
+      /* If iOS WebKit rejects SpeechRecognition immediately (<700ms with zero speech), fall back to keyboard mic */
+      const hadAnySpeech = sessionFinalText.trim() !== sessionTranscriptBase.trim() || sessionInterimText.trim().length > 0;
+      if (isRecording && !hadAnySpeech && elapsed < 700 && isIOS) {
+        stopMic();
+        focusForIosKeyboardDictation();
+        return;
+      }
+
+      if (isRecording) {
+        flushInterimToFinal();
+        sessionTranscriptBase = sessionFinalText;
+        sessionSegments = [];
+        syncMemoFieldFromSpeech();
+
+        setTimeout(() => {
+          if (isRecording && activeRecognition === rec) {
+            try {
+              rec.start();
+            } catch {
+              startFreshMemoRecognitionSession();
+            }
+          }
+        }, 100);
+      }
+    };
+
+    try {
+      rec.start();
+    } catch {
+      stopMic();
+      focusForIosKeyboardDictation();
+    }
+  }
+
   micBtn?.addEventListener('click', () => {
     if (isRecording) {
       stopMic();
       showToast('Aufnahme beendet ✓');
       return;
     }
-    if (!SpeechRec || (isIOS && isStandalonePWA())) {
+    if (!SpeechRec) {
       focusForIosKeyboardDictation();
       return;
     }
-    try {
-      recognition = new SpeechRec();
-      recognition.lang = 'de-DE';
-      recognition.interimResults = true;
-      recognition.continuous = !isIOS;
-      recognition.maxAlternatives = 1;
-
-      baseTextBeforeMic = area.value.trim();
-      micStartedAt = Date.now();
-      isRecording = true;
-      micBtn.classList.add('recording');
-      showToast('🎤 Ich höre zu… (erneut tippen zum Stoppen)');
-
-      recognition.onresult = (event) => {
-        let spoken = '';
-        for (let i = 0; i < event.results.length; i++) {
-          spoken += event.results[i][0].transcript;
-        }
-        spoken = spoken.trim();
-        area.value = baseTextBeforeMic ? `${baseTextBeforeMic}\n${spoken}` : spoken;
-        persistMemo();
-      };
-
-      recognition.onerror = (event) => {
-        const errCode = event?.error || '';
-        stopMic();
-        if (errCode === 'no-speech' || errCode === 'aborted') return;
-        if (isIOS) {
-          focusForIosKeyboardDictation();
-        } else {
-          showToast('Mikrofon nicht verfügbar – bitte Berechtigung prüfen');
-        }
-      };
-
-      recognition.onend = () => {
-        const elapsed = Date.now() - micStartedAt;
-        const hadNewText = area.value.trim() !== baseTextBeforeMic;
-        stopMic();
-        if (!hadNewText && elapsed < 900 && isIOS) {
-          focusForIosKeyboardDictation();
-        }
-      };
-
-      recognition.start();
-    } catch {
-      stopMic();
-      focusForIosKeyboardDictation();
-    }
+    const existing = area.value.trim();
+    sessionTranscriptBase = existing ? (existing.endsWith('\n') ? existing : existing.replace(/[;,]+\s*$/, '') + '; ') : '';
+    sessionFinalText = sessionTranscriptBase;
+    sessionInterimText = '';
+    sessionSegments = [];
+    micStartedAt = Date.now();
+    isRecording = true;
+    micBtn.classList.add('recording');
+    showToast('🎤 Ich höre zu… (erneut tippen zum Stoppen)');
+    startFreshMemoRecognitionSession();
   });
 
   area.addEventListener('focus', () => {
