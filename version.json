@@ -1,5 +1,5 @@
 {
-  "version": "1.9.3",
+  "version": "1.9.4",
   "date": "2026-11-19",
-  "notes": "Schnell-Memo-Mikrofon trennt Begriffe automatisch mit '; ' (wie in der Notizen-App)"
+  "notes": "Fix für iPhone-PWA-Diktat im Schnell-Memo: Text landet zuverlässig im Feld inkl. automatischem '; '"
 }
