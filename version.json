@@ -1,5 +1,5 @@
 {
-  "version": "1.9.1",
+  "version": "1.9.2",
   "date": "2026-11-19",
-  "notes": "Notizen-Link aus Schnell-Memo öffnet direkt im Board, Teilen-Bridge & JUH-Aufsummieren gefixt"
+  "notes": "iPhone PDF-Export über natives Teilen/Quick-Look + Cache-Refresh im Cockpit"
 }

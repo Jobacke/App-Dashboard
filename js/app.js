@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.9.1';
+const APP_VERSION = '1.9.2';
 const APP_BUILD_DATE = '19.11.2026';
 
 const APPS = [
@@ -925,15 +925,44 @@ function closeCockpit() {
 
 let pendingCockpitShare = null;
 
+function base64ToPdfBlob(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: 'application/pdf' });
+}
+
 function hideCockpitShareBar() {
+  if (pendingCockpitShare?.blobUrl) {
+    try { URL.revokeObjectURL(pendingCockpitShare.blobUrl); } catch {}
+  }
   pendingCockpitShare = null;
   const bar = document.getElementById('cockpit-share-bar');
   if (bar) bar.hidden = true;
 }
 
 function showCockpitShareBar(payload) {
+  if (pendingCockpitShare?.blobUrl) {
+    try { URL.revokeObjectURL(pendingCockpitShare.blobUrl); } catch {}
+  }
   pendingCockpitShare = payload;
   const bar = document.getElementById('cockpit-share-bar');
+  const labelEl = bar?.querySelector('.cockpit-share-label');
+  const primaryBtn = document.getElementById('cockpit-share-trigger');
+  const secondaryBtn = document.getElementById('cockpit-share-copy');
+
+  if (payload.kind === 'pdf') {
+    if (labelEl) labelEl.textContent = 'PDF bereit';
+    if (primaryBtn) primaryBtn.textContent = 'PDF teilen ↗';
+    if (secondaryBtn) secondaryBtn.textContent = 'Ansehen';
+  } else {
+    if (labelEl) labelEl.textContent = 'Notiz zum Weiterleiten bereit';
+    if (primaryBtn) primaryBtn.textContent = 'Jetzt teilen ↗';
+    if (secondaryBtn) secondaryBtn.textContent = 'Kopieren';
+  }
+
   if (bar) bar.hidden = false;
 }
 
@@ -967,14 +996,49 @@ function initCockpitControls() {
 
   document.getElementById('cockpit-share-dismiss')?.addEventListener('click', hideCockpitShareBar);
   document.getElementById('cockpit-share-copy')?.addEventListener('click', async () => {
-    if (!pendingCockpitShare?.text) return;
+    if (!pendingCockpitShare) return;
+    if (pendingCockpitShare.kind === 'pdf' && pendingCockpitShare.pdfBlob) {
+      const url = pendingCockpitShare.blobUrl || URL.createObjectURL(pendingCockpitShare.pdfBlob);
+      pendingCockpitShare.blobUrl = url;
+      const win = window.open(url, '_blank');
+      if (!win) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.click();
+      }
+      return;
+    }
+    if (!pendingCockpitShare.text) return;
     const ok = await copyTextTopLevel(pendingCockpitShare.text);
     showToast(ok ? 'Notiz in Zwischenablage kopiert ✓' : 'Kopieren nicht möglich');
     if (ok) hideCockpitShareBar();
   });
   document.getElementById('cockpit-share-trigger')?.addEventListener('click', async () => {
-    if (!pendingCockpitShare?.text) return;
+    if (!pendingCockpitShare) return;
     const payload = pendingCockpitShare;
+    if (payload.kind === 'pdf' && payload.pdfFile) {
+      if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [payload.pdfFile] }))) {
+        try {
+          await navigator.share({ title: payload.title || 'Notiz', files: [payload.pdfFile] });
+          hideCockpitShareBar();
+          return;
+        } catch (err) {
+          if (err && err.name === 'AbortError') {
+            hideCockpitShareBar();
+            return;
+          }
+        }
+      }
+      /* Fallback: open PDF directly in built-in Safari Quick Look PDF viewer */
+      const url = payload.blobUrl || URL.createObjectURL(payload.pdfBlob);
+      payload.blobUrl = url;
+      window.open(url, '_blank');
+      hideCockpitShareBar();
+      return;
+    }
+    if (!payload.text) return;
     if (navigator.share) {
       try {
         await navigator.share({ text: payload.text });
@@ -1002,7 +1066,13 @@ function initCockpitControls() {
     const loader = document.getElementById('cockpit-loader');
     if (iframe && iframe.src && iframe.src !== 'about:blank') {
       if (loader) loader.hidden = false;
-      iframe.src = iframe.src;
+      try {
+        const u = new URL(iframe.src);
+        u.searchParams.set('_r', String(Date.now()));
+        iframe.src = u.toString();
+      } catch {
+        iframe.src = iframe.src;
+      }
     }
   });
 
@@ -1059,7 +1129,7 @@ function initCockpitControls() {
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
       );
     } else if (e.data.type === 'board-share-text' && typeof e.data.text === 'string') {
-      const payload = { title: e.data.title || 'Notiz', text: e.data.text };
+      const payload = { kind: 'text', title: e.data.title || 'Notiz', text: e.data.text };
       (async () => {
         if (navigator.share) {
           try {
@@ -1072,6 +1142,28 @@ function initCockpitControls() {
         await copyTextTopLevel(payload.text);
         showCockpitShareBar(payload);
       })();
+    } else if (e.data.type === 'board-share-pdf' && typeof e.data.base64 === 'string') {
+      try {
+        const fileName = e.data.fileName || 'Notiz.pdf';
+        const title = e.data.title || 'Notiz';
+        const pdfBlob = base64ToPdfBlob(e.data.base64);
+        let pdfFile = null;
+        try { pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' }); } catch {}
+        const payload = { kind: 'pdf', fileName, title, pdfBlob, pdfFile, blobUrl: null };
+        (async () => {
+          if (pdfFile && navigator.share && (!navigator.canShare || navigator.canShare({ files: [pdfFile] }))) {
+            try {
+              await navigator.share({ title, files: [pdfFile] });
+              return;
+            } catch (err) {
+              if (err && err.name === 'AbortError') return;
+            }
+          }
+          showCockpitShareBar(payload);
+        })();
+      } catch (err) {
+        console.warn('PDF share bridge error:', err);
+      }
     } else if (e.data.type === 'notizen-status') {
       const hasNotes = Boolean(e.data.hasNotes);
       if (state.notizenHasNotes !== hasNotes) {
