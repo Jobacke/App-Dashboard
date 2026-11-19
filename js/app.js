@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '1.9.6';
+const APP_VERSION = '1.9.7';
 const APP_BUILD_DATE = '19.11.2026';
 
 const APPS = [
@@ -1324,11 +1324,14 @@ function initScratchpad() {
     if (!document.hidden) pingNotizen();
   });
 
-  /* Champions-League Microphone Dictation (1:1 Port of Notizen App's Proven iOS Speech Engine!) */
+  /* Champions-League Microphone Dictation (Clean Back-to-Back iOS SFSpeechRecognizer Engine) */
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
   let activeRecognition = null;
-  let micMediaStream = null;
   let isRecording = false;
+  let micRestartTimer = null;
+  let micStartRetryTimer = null;
+  let micStartRetries = 0;
+  let lastMicStopTime = 0;
   let sessionTranscriptBase = '';
   let sessionSegments = [];
   let sessionFinalText = '';
@@ -1481,17 +1484,18 @@ function initScratchpad() {
     }
   }
 
-  function releaseMicStream() {
-    if (micMediaStream) {
-      try { micMediaStream.getTracks().forEach((t) => t.stop()); } catch {}
-      micMediaStream = null;
-    }
-  }
-
   function stopMic() {
-    if (!isRecording && !activeRecognition && !micMediaStream) return;
+    clearTimeout(micRestartTimer);
+    clearTimeout(micStartRetryTimer);
+    micRestartTimer = null;
+    micStartRetryTimer = null;
+    if (!isRecording && !activeRecognition) return;
     isRecording = false;
+    lastMicStopTime = Date.now();
     setMicRecordingUI(false);
+
+    /* Capture any live interim words BEFORE aborting so nothing is lost */
+    flushInterimToFinal();
 
     if (activeRecognition) {
       const rec = activeRecognition;
@@ -1500,20 +1504,27 @@ function initScratchpad() {
         rec.onresult = null;
         rec.onend = null;
         rec.onerror = null;
-        rec.stop();
+        rec.onaudiostart = null;
+        rec.onspeechstart = null;
+        /* abort() immediately releases iOS SFSpeechRecognizer so a 2nd dictation shortly after works reliably! */
+        if (typeof rec.abort === 'function') {
+          rec.abort();
+        } else {
+          rec.stop();
+        }
       } catch {}
     }
 
-    releaseMicStream();
-    flushInterimToFinal();
     if (sessionFinalText) {
       syncMemoFieldFromSpeech();
       persistMemo();
     }
   }
 
-  /* Always instantiate a brand-new SpeechRecognition object (critical for iOS WebKit, 1:1 from Notizen app!) */
+  /* Always instantiate a brand-new SpeechRecognition object (critical for iOS WebKit back-to-back dictation!) */
   function startFreshMemoRecognitionSession() {
+    clearTimeout(micRestartTimer);
+    clearTimeout(micStartRetryTimer);
     if (!isRecording || !SpeechRec) return;
 
     const rec = new SpeechRec();
@@ -1523,6 +1534,7 @@ function initScratchpad() {
     activeRecognition = rec;
 
     let lastResultEventTime = Date.now();
+    let audioConfirmed = false;
 
     /* Injects "; " into cumulative iOS/Safari single-segment transcripts only after a clear pause (> 1150ms) between terms */
     const applyPauseSplittingToSegment = (segObj, rawTranscript, now) => {
@@ -1558,7 +1570,17 @@ function initScratchpad() {
       return trimmedRaw;
     };
 
+    const markAudioActive = () => {
+      audioConfirmed = true;
+      micStartRetries = 0;
+      clearTimeout(micStartRetryTimer);
+    };
+
+    rec.onaudiostart = markAudioActive;
+    rec.onspeechstart = markAudioActive;
+
     rec.onresult = (event) => {
+      markAudioActive();
       const now = Date.now();
       const currentInterimParts = [];
 
@@ -1607,12 +1629,23 @@ function initScratchpad() {
     };
 
     rec.onerror = (event) => {
+      if (activeRecognition !== rec) return;
       const errCode = event?.error || '';
-      if (errCode === 'no-speech' || errCode === 'aborted') return;
+      if (errCode === 'no-speech') return;
       console.warn('Memo speech recognition warning:', errCode);
       if (errCode === 'not-allowed' || errCode === 'service-not-allowed') {
         stopMic();
         showToast('Mikrofonzugriff bitte erlauben (Safari/iOS Einstellungen)');
+        return;
+      }
+      /* On iOS rapid back-to-back start, audio-capture/aborted can happen while previous session finishes releasing -> clean retry */
+      if ((errCode === 'audio-capture' || errCode === 'aborted') && isRecording && micStartRetries < 3) {
+        micStartRetries++;
+        activeRecognition = null;
+        try { rec.abort(); } catch {}
+        micRestartTimer = setTimeout(() => {
+          if (isRecording) startFreshMemoRecognitionSession();
+        }, 320);
       }
     };
 
@@ -1626,22 +1659,46 @@ function initScratchpad() {
         sessionSegments = [];
         syncMemoFieldFromSpeech();
 
-        setTimeout(() => {
+        /* Slight cooldown (220ms) gives iOS SFSpeechRecognizer time to release cleanly before next segment */
+        micRestartTimer = setTimeout(() => {
           if (isRecording) {
             startFreshMemoRecognitionSession();
           }
-        }, 100);
+        }, 220);
       }
     };
 
     try {
       rec.start();
+      /* Back-to-back iOS safety retry: if iOS audio session was still releasing from a just-ended dictation and onaudiostart hasn't fired after 750ms, cleanly restart once */
+      micStartRetryTimer = setTimeout(() => {
+        if (isRecording && activeRecognition === rec && !audioConfirmed && micStartRetries < 2) {
+          micStartRetries++;
+          activeRecognition = null;
+          try {
+            rec.onresult = null;
+            rec.onend = null;
+            rec.onerror = null;
+            rec.abort();
+          } catch {}
+          micRestartTimer = setTimeout(() => {
+            if (isRecording) startFreshMemoRecognitionSession();
+          }, 260);
+        }
+      }, 750);
     } catch (e) {
-      console.warn('Could not start SpeechRecognition synchronously:', e);
+      console.warn('SpeechRecognition start busy, retrying shortly:', e);
+      activeRecognition = null;
+      if (isRecording && micStartRetries < 3) {
+        micStartRetries++;
+        micRestartTimer = setTimeout(() => {
+          if (isRecording) startFreshMemoRecognitionSession();
+        }, 300);
+      }
     }
   }
 
-  micBtn?.addEventListener('click', async () => {
+  micBtn?.addEventListener('click', () => {
     if (isRecording) {
       stopMic();
       showToast('Aufnahme beendet ✓');
@@ -1657,13 +1714,15 @@ function initScratchpad() {
     /* Blur textarea so iOS keyboard does NOT pop up and steal audio focus from SpeechRecognition! */
     try { area.blur(); } catch {}
 
-    /* Cleanly stop any stale instance synchronously (no await!) */
+    clearTimeout(micRestartTimer);
+    clearTimeout(micStartRetryTimer);
+
     if (activeRecognition) {
       try {
         activeRecognition.onresult = null;
         activeRecognition.onend = null;
         activeRecognition.onerror = null;
-        activeRecognition.stop();
+        activeRecognition.abort();
       } catch {}
       activeRecognition = null;
     }
@@ -1673,36 +1732,19 @@ function initScratchpad() {
     sessionFinalText = sessionTranscriptBase;
     sessionInterimText = '';
     sessionSegments = [];
+    micStartRetries = 0;
     isRecording = true;
     setMicRecordingUI(true);
     showToast('🎤 Sprich jetzt… (erneut tippen zum Stoppen)');
 
-    /* CRITICAL FOR iOS / SAFARI (exact Notizen-App pattern):
-       1) Call SpeechRecognition.start() SYNCHRONOUSLY inside the user's tap gesture BEFORE any await! */
-    startFreshMemoRecognitionSession();
-
-    /* 2) Also activate iOS AVAudioSession & microphone permission via getUserMedia (NO AudioContext on iOS!) */
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }
-        });
-        if (!isRecording) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        micMediaStream = stream;
-      } catch (err) {
-        console.warn('Board mic getUserMedia error:', err);
-        if (err && err.name === 'NotAllowedError') {
-          stopMic();
-          showToast('Mikrofonzugriff nicht erlaubt – bitte in iOS Einstellungen erlauben');
-        }
-      }
+    /* If a previous dictation ended < 350ms ago, wait briefly so iOS finishes tearing down SFSpeechRecognizer, otherwise start synchronously inside the tap gesture */
+    const msSinceLastStop = Date.now() - lastMicStopTime;
+    if (lastMicStopTime > 0 && msSinceLastStop < 350) {
+      micRestartTimer = setTimeout(() => {
+        if (isRecording) startFreshMemoRecognitionSession();
+      }, 360 - msSinceLastStop);
+    } else {
+      startFreshMemoRecognitionSession();
     }
   });
 
@@ -1749,6 +1791,10 @@ function initScratchpad() {
       btn.innerHTML = origHtml;
       if (res && res.ok) {
         area.value = '';
+        sessionTranscriptBase = '';
+        sessionFinalText = '';
+        sessionInterimText = '';
+        sessionSegments = [];
         autoResizeMemoField();
         localStorage.removeItem('dashboard_scratchpad');
         area.blur();

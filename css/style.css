@@ -805,13 +805,23 @@ html[data-theme="light"] .icon-sun { display: none; }
 }
 
 @media (max-width: 400px) {
+  .scratchpad-card {
+    padding: 10px 11px;
+  }
+  .scratchpad-left-controls {
+    gap: 4px;
+  }
+  .memo-transfer-btns {
+    gap: 4px;
+  }
   .memo-cat-btn {
-    padding: 0 6px;
-    font-size: 0.68rem;
+    padding: 0 5.5px;
+    font-size: 0.67rem;
     gap: 3px;
   }
   .scratchpad-link {
-    font-size: 0.71rem;
+    font-size: 0.69rem;
+    padding: 2px 2px;
   }
 }
 

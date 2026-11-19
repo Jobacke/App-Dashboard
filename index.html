@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Board" />
-  <link rel="manifest" href="manifest.webmanifest?v=25" />
+  <link rel="manifest" href="manifest.webmanifest?v=26" />
   <link rel="icon" type="image/svg+xml" href="icons/dashboard.svg" />
   <link rel="alternate icon" type="image/png" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2" />
@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=25" />
+  <link rel="stylesheet" href="css/style.css?v=26" />
   <script>
     try {
       const savedTheme = localStorage.getItem('dashboard_theme') || 'dark';
@@ -47,7 +47,7 @@
         <div class="brand-text">
           <div class="brand-title-row">
             <span class="brand-title">Board</span>
-            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v1.9.6</span>
+            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v1.9.7</span>
           </div>
           <span class="brand-subtitle">vjbackhaus.de Ecosystem</span>
         </div>
@@ -172,7 +172,7 @@
           <div class="scratchpad-actions">
             <span class="scratchpad-saved" id="scratchpad-status">Gespeichert</span>
             <button type="button" class="scratchpad-save-btn" id="scratchpad-done-btn" hidden>Fertig ✓</button>
-            <button type="button" id="scratchpad-open-notizen" class="scratchpad-link" title="Notizen-App direkt im Board öffnen">→ Notizen</button>
+            <button type="button" id="scratchpad-open-notizen" class="scratchpad-link" title="Remembers direkt im Board öffnen">→ Remembers</button>
           </div>
         </div>
         <textarea id="quick-scratchpad" class="scratchpad-input" rows="1" placeholder="Kurznotiz hier eintragen"></textarea>
@@ -188,7 +188,7 @@
 
     <!-- App Footer with Version & Build Info -->
     <footer class="dashboard-footer">
-      <span>Board · <strong id="footer-version">v1.9.6</strong></span>
+      <span>Board · <strong id="footer-version">v1.9.7</strong></span>
       <span>·</span>
       <span id="footer-date">Stand 19.11.2026</span>
       <span>·</span>
@@ -261,6 +261,6 @@
   <!-- Toast Notification -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
-  <script src="js/app.js?v=25"></script>
+  <script src="js/app.js?v=26"></script>
 </body>
 </html>
