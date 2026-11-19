@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.1.1';
 const APP_BUILD_DATE = '19.11.2026';
 
 const APPS = [
@@ -1591,9 +1591,10 @@ function initScratchpad() {
     formData.append('language', 'de');
     formData.append('response_format', 'verbose_json');
     formData.append('temperature', '0');
+    /* Keep prompt short & vocabulary-only (no instruction sentences or example quantities that Whisper could echo on silence!) */
     formData.append(
       'prompt',
-      'Rettungsdienst, JUH, Materialauffüllung, Notizen: Viggo, Viggos, Jonosteril, NaCl 0,9%, Ringer, Mullbinde, Mullbinden, 8 cm Mullbinde, Kompressen 10x10, Decke, Decken, Laken, EKG-Elektroden, Verbandpäckchen, Handschuhe, Pflaster, Spritze, Kanüle, RTW, NEF, KTW, ZNA. Begriffe mit Semikolon trennen: 2 x Decken; 3 x Laken; 8 cm Mullbinde;'
+      'Viggo, Jonosteril, NaCl 0,9%, Ringer, Mullbinde, Kompressen, Decken, Laken, EKG-Elektroden, Verbandpäckchen, Handschuhe, Pflaster, Spritze, Kanüle, RTW, NEF, KTW, JUH, ZNA.'
     );
 
     const fetchOpts = {
@@ -1613,25 +1614,45 @@ function initScratchpad() {
     }
 
     const data = await resp.json();
-    const HALLUCINATION_RE = /^(?:untertitel|vielen dank fürs zuschauen|vielen dank für ihre aufmerksamkeit|amara\.org|tschüss\.?|danke\.?)$/i;
+    const HALLUCINATION_RE = /(?:untertitel|amara\.org|vielen dank fürs zuschauen|vielen dank für ihre aufmerksamkeit|abonnier|copyright|www\.|https?:|begriffe mit semikolon|materialauffüllung|viggo,\s*jonosteril|^\s*(?:tschüss|danke|musik|applaus|mbc|zdf|ard|swr|wdr|ndr|orf|srf)\s*[.!?]*\s*$)/i;
+    const CRYPTIC_CHAR_RE = /[^\u0020-\u007E\u00A0-\u024F\u2010-\u2026€%°²³µ×\n\r\t]/;
+
+    function isBadWhisperSegment(seg) {
+      const txt = String(seg?.text || '').trim();
+      if (!txt) return true;
+      /* Filter silence / button-click noise & low-confidence cryptic Whisper tail hallucinations */
+      if (typeof seg.no_speech_prob === 'number' && seg.no_speech_prob > 0.55) return true;
+      if (typeof seg.avg_logprob === 'number' && seg.avg_logprob < -0.85) return true;
+      if (typeof seg.compression_ratio === 'number' && seg.compression_ratio > 2.4) return true;
+      if (CRYPTIC_CHAR_RE.test(txt)) return true;
+      if (HALLUCINATION_RE.test(txt)) return true;
+      /* Drop pure punctuation or single stray non-alphanumeric symbol */
+      if (!/[A-Za-zÄÖÜäöüß0-9]/.test(txt)) return true;
+      return false;
+    }
 
     let rawCombined = '';
     if (Array.isArray(data.segments) && data.segments.length > 0) {
       const cleanSegs = [];
       for (const seg of data.segments) {
+        if (isBadWhisperSegment(seg)) continue;
         const segText = String(seg.text || '').trim();
-        if (!segText) continue;
-        if (typeof seg.no_speech_prob === 'number' && seg.no_speech_prob > 0.85 && segText.length < 40) continue;
-        if (HALLUCINATION_RE.test(segText.replace(/[.!?]+$/, '').trim())) continue;
+        /* Deduplicate identical trailing Whisper loop segments */
+        if (cleanSegs.length > 0 && cleanSegs[cleanSegs.length - 1].toLowerCase() === segText.toLowerCase()) {
+          continue;
+        }
         cleanSegs.push(segText);
       }
       rawCombined = cleanSegs.join('; ');
     } else {
-      rawCombined = String(data.text || '').trim();
+      const fallbackTxt = String(data.text || '').trim();
+      if (fallbackTxt && !CRYPTIC_CHAR_RE.test(fallbackTxt) && !HALLUCINATION_RE.test(fallbackTxt)) {
+        rawCombined = fallbackTxt;
+      }
     }
 
     const formatted = formatMemoSpeechText(rawCombined);
-    if (!formatted || HALLUCINATION_RE.test(formatted)) {
+    if (!formatted || HALLUCINATION_RE.test(formatted) || CRYPTIC_CHAR_RE.test(formatted)) {
       return { ok: false, error: 'Keine Sprache erkannt – bitte näher ins Mikrofon sprechen' };
     }
     return { ok: true, text: formatted };

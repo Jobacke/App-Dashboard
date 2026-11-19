@@ -1,5 +1,5 @@
 {
-  "version": "2.1.0",
+  "version": "2.1.1",
   "date": "2026-11-19",
-  "notes": "Live-Vorschau während des Diktierens (alle ~2,4 Sek. über Groq Whisper) + sauberer Final-Pass beim Stoppen"
+  "notes": "Whisper-Halluzinations- & Stille-Filter am Aufnahme-Ende (kein kryptischer Text mehr)"
 }
