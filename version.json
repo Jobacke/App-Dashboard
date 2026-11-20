@@ -1,5 +1,5 @@
 {
-  "version": "2.1.2",
-  "date": "2026-11-19",
-  "notes": "Sauberes Deutsch über vollwertiges whisper-large-v3 + unzerschnittene iOS-MP4-Aufnahme ohne 250ms-Stückelung"
+  "version": "2.1.3",
+  "date": "2026-11-20",
+  "notes": "Board-Tresor Auto-Login (board_mopped_auth) auch für Moppedtagebuch ergänzt"
 }

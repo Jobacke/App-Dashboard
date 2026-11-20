@@ -2,8 +2,8 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '2.1.2';
-const APP_BUILD_DATE = '19.11.2026';
+const APP_VERSION = '2.1.3';
+const APP_BUILD_DATE = '20.11.2026';
 
 const APPS = [
   {
@@ -847,6 +847,11 @@ function openCockpit(appId, customUrl = null) {
       const stRaw = localStorage.getItem('board_vault_schichttagebuch_auto_auth_v1');
       if (stRaw) {
         finalUrl += (finalUrl.includes('#') ? '&' : '#') + 'board_schicht_auth=' + encodeURIComponent(stRaw);
+      }
+    } else if (app.id === 'mopped' && !finalUrl.includes('board_mopped_auth=')) {
+      const mpRaw = localStorage.getItem('board_vault_mopped_auto_auth_v1');
+      if (mpRaw) {
+        finalUrl += (finalUrl.includes('#') ? '&' : '#') + 'board_mopped_auth=' + encodeURIComponent(mpRaw);
       }
     }
   } catch (e) {}
