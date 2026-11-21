@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '2.2.3';
+const APP_VERSION = '2.2.4';
 const APP_BUILD_DATE = '21.11.2026';
 
 const APPS = [
@@ -853,6 +853,11 @@ function openCockpit(appId, customUrl = null) {
       const mpRaw = localStorage.getItem('board_vault_mopped_auto_auth_v1');
       if (mpRaw) {
         finalUrl += (finalUrl.includes('#') ? '&' : '#') + 'board_mopped_auth=' + encodeURIComponent(mpRaw);
+      }
+    } else if (app.id === 'zna-navi' && !finalUrl.includes('board_zna_filter=')) {
+      const znaRaw = localStorage.getItem('board_vault_zna_filter_v1');
+      if (znaRaw) {
+        finalUrl += (finalUrl.includes('#') ? '&' : '#') + 'board_zna_filter=' + encodeURIComponent(znaRaw);
       }
     }
   } catch (e) {}

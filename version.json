@@ -1,5 +1,5 @@
 {
-  "version": "2.2.3",
+  "version": "2.2.4",
   "date": "2026-11-21",
-  "notes": "MEZ im gleichen dezenten blauen Rahmen-Look wie KW"
+  "notes": "Board-Tresor speichert auch die ZNA-Navi Kategoriefilter & Navi-Auswahl dauerhaft über Neustarts hinweg"
 }
