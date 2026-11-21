@@ -538,9 +538,17 @@ html[data-theme="light"] .icon-sun { display: none; }
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
   font-size: 0.82rem;
   color: var(--text-secondary);
   font-weight: 500;
+}
+
+.clock-date {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
 .clock-badges {
@@ -553,14 +561,20 @@ html[data-theme="light"] .icon-sun { display: none; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 10px;
+  padding: 2px 9px;
   border-radius: 999px;
-  font-size: 0.74rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 500;
   font-family: var(--font-mono);
-  color: var(--accent-gold);
-  border: 1px solid rgba(245, 184, 46, 0.28);
-  background: rgba(245, 184, 46, 0.09);
+  color: rgba(147, 184, 232, 0.78);
+  border: 1px solid rgba(96, 150, 220, 0.2);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+html[data-theme="light"] .kw-badge {
+  color: #4b6c96;
+  border-color: rgba(59, 130, 246, 0.22);
+  background: rgba(59, 130, 246, 0.08);
 }
 
 .clock-tz {

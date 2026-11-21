@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.2.1';
 const APP_BUILD_DATE = '21.11.2026';
 
 const APPS = [
@@ -2229,7 +2229,7 @@ function initChronograph() {
     if (!lapsList) return;
     if (copyBtn) copyBtn.hidden = chrono.laps.length === 0;
     if (chrono.laps.length === 0) {
-      lapsList.innerHTML = '<div class="chrono-laps-empty">Start tippen · „Runde“ erfasst Zwischenzeiten inkl. Uhrzeit</div>';
+      lapsList.innerHTML = '';
       if (lapHand) lapHand.setAttribute('opacity', '0');
       return;
     }
