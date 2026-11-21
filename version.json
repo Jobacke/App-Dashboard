@@ -1,5 +1,5 @@
 {
-  "version": "2.2.2",
+  "version": "2.2.3",
   "date": "2026-11-21",
-  "notes": "Datum und Uhrzeit mittig zentriert, KW und MEZ unauffällig links seitlich"
+  "notes": "MEZ im gleichen dezenten blauen Rahmen-Look wie KW"
 }
