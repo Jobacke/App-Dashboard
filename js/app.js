@@ -2,8 +2,8 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '2.1.3';
-const APP_BUILD_DATE = '20.11.2026';
+const APP_VERSION = '2.2.0';
+const APP_BUILD_DATE = '21.11.2026';
 
 const APPS = [
   {
@@ -244,6 +244,7 @@ function reorderAppBefore(sourceId, targetId) {
    ========================================================================== */
 document.addEventListener('DOMContentLoaded', () => {
   initClock();
+  initChronograph();
   initLaunchModeControl();
   initThemeToggle();
   initScratchpad();
@@ -2049,4 +2050,340 @@ function initVersionDisplayAndUpdateCheck() {
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) checkRemoteVersion(false);
   });
+}
+
+/* ==========================================================================
+   Chronograph Pro · Carbon Crimson Stopwatch
+   ========================================================================== */
+function initChronograph() {
+  const STORAGE_KEY = 'board_chrono_state_v1';
+  const trigger = document.getElementById('clock-card-trigger');
+  const backdrop = document.getElementById('chrono-modal-backdrop');
+  const modal = document.getElementById('chrono-modal');
+  const closeBtn = document.getElementById('chrono-close-btn');
+  const priBtn = document.getElementById('chrono-pri-btn');
+  const secBtn = document.getElementById('chrono-sec-btn');
+  const copyBtn = document.getElementById('chrono-copy-btn');
+  const digitalEl = document.getElementById('chrono-digital');
+  const secHand = document.getElementById('chrono-sec-hand');
+  const minHand = document.getElementById('chrono-min-hand');
+  const lapHand = document.getElementById('chrono-lap-hand');
+  const curLapLabel = document.getElementById('chrono-current-lap-label');
+  const curLapTime = document.getElementById('chrono-current-lap-time');
+  const lapsList = document.getElementById('chrono-laps-list');
+  const pill = document.getElementById('clock-chrono-pill');
+  const pillDot = document.getElementById('clock-chrono-dot');
+  const pillLabel = document.getElementById('clock-chrono-label');
+
+  if (!trigger || !backdrop || !modal) return;
+
+  /* Build precision 60-sec, 1/5-sec & 30-min subdial SVG indices */
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const ticksSlot = document.getElementById('chrono-ticks');
+  if (ticksSlot && !ticksSlot.childElementCount) {
+    for (let i = 0; i < 300; i++) {
+      const isSec = i % 5 === 0;
+      const secIdx = i / 5;
+      const isMajor = isSec && secIdx % 5 === 0;
+      const a = (i * 1.2 - 90) * Math.PI / 180;
+      const r1 = isMajor ? 96 : (isSec ? 101 : 104.5);
+      const r2 = 108;
+      const line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('x1', (130 + r1 * Math.cos(a)).toFixed(2));
+      line.setAttribute('y1', (130 + r1 * Math.sin(a)).toFixed(2));
+      line.setAttribute('x2', (130 + r2 * Math.cos(a)).toFixed(2));
+      line.setAttribute('y2', (130 + r2 * Math.sin(a)).toFixed(2));
+      line.setAttribute('stroke', isMajor ? '#ffffff' : (isSec ? 'rgba(255,133,162,0.58)' : 'rgba(255,133,162,0.2)'));
+      line.setAttribute('stroke-width', isMajor ? '2.2' : (isSec ? '1.15' : '0.7'));
+      ticksSlot.appendChild(line);
+
+      if (isMajor && secIdx % 15 === 0) {
+        const txt = document.createElementNS(svgNS, 'text');
+        txt.setAttribute('x', (130 + 84 * Math.cos(a)).toFixed(2));
+        txt.setAttribute('y', (130 + 84 * Math.sin(a) + 3.8).toFixed(2));
+        txt.setAttribute('text-anchor', 'middle');
+        txt.setAttribute('fill', '#fda4af');
+        txt.setAttribute('font-size', '11');
+        txt.setAttribute('font-weight', '700');
+        txt.setAttribute('font-family', 'JetBrains Mono, ui-monospace, monospace');
+        txt.textContent = secIdx === 0 ? '60' : String(secIdx);
+        ticksSlot.appendChild(txt);
+      }
+    }
+  }
+
+  const subticksSlot = document.getElementById('chrono-subticks');
+  if (subticksSlot && !subticksSlot.childElementCount) {
+    for (let i = 0; i < 30; i++) {
+      const a = (i * 12 - 90) * Math.PI / 180;
+      const major = i % 5 === 0;
+      const r1 = major ? 21.5 : 23.5;
+      const r2 = 26;
+      const line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('x1', (130 + r1 * Math.cos(a)).toFixed(2));
+      line.setAttribute('y1', (82 + r1 * Math.sin(a)).toFixed(2));
+      line.setAttribute('x2', (130 + r2 * Math.cos(a)).toFixed(2));
+      line.setAttribute('y2', (82 + r2 * Math.sin(a)).toFixed(2));
+      line.setAttribute('stroke', major ? '#fecdd3' : 'rgba(255,133,162,0.35)');
+      line.setAttribute('stroke-width', major ? '1.2' : '0.7');
+      subticksSlot.appendChild(line);
+    }
+  }
+
+  /* Restore persistent state across PWA reloads */
+  let chrono = { running: false, startEpoch: 0, elapsed: 0, lastLapTotal: 0, laps: [] };
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.elapsed === 'number') {
+        chrono = {
+          running: !!parsed.running,
+          startEpoch: Number(parsed.startEpoch) || 0,
+          elapsed: Math.max(0, Number(parsed.elapsed) || 0),
+          lastLapTotal: Math.max(0, Number(parsed.lastLapTotal) || 0),
+          laps: Array.isArray(parsed.laps) ? parsed.laps : []
+        };
+      }
+    }
+  } catch (e) {}
+
+  let rafId = null;
+  let bgIntervalId = null;
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(chrono));
+    } catch (e) {}
+  }
+
+  function getElapsedMs() {
+    return chrono.running ? chrono.elapsed + Math.max(0, Date.now() - chrono.startEpoch) : chrono.elapsed;
+  }
+
+  function formatChrono(ms, shortForPill = false) {
+    const totalCs = Math.floor(ms / 10);
+    const cs = String(totalCs % 100).padStart(2, '0');
+    const totalSec = Math.floor(totalCs / 100);
+    const sec = String(totalSec % 60).padStart(2, '0');
+    const totalMin = Math.floor(totalSec / 60);
+    const min = String(totalMin % 60).padStart(2, '0');
+    const hrs = Math.floor(totalMin / 60);
+    if (shortForPill) {
+      const tenth = String(Math.floor((totalCs % 100) / 10));
+      return hrs > 0 ? `${hrs}:${min}:${sec}` : `${min}:${sec}.${tenth}`;
+    }
+    return hrs > 0 ? `${hrs}:${min}:${sec}.${cs}` : `${min}:${sec}.${cs}`;
+  }
+
+  function updateClockPill() {
+    if (!pill || !pillLabel || !pillDot) return;
+    const ms = getElapsedMs();
+    if (chrono.running) {
+      pill.classList.add('is-running');
+      pill.classList.remove('is-paused');
+      pillDot.hidden = false;
+      pillLabel.textContent = formatChrono(ms, true);
+    } else if (ms > 0) {
+      pill.classList.remove('is-running');
+      pill.classList.add('is-paused');
+      pillDot.hidden = false;
+      pillLabel.textContent = formatChrono(ms, true);
+    } else {
+      pill.classList.remove('is-running', 'is-paused');
+      pillDot.hidden = true;
+      pillLabel.textContent = 'Stoppuhr';
+    }
+  }
+
+  function syncBackgroundTimer() {
+    if (bgIntervalId) {
+      clearInterval(bgIntervalId);
+      bgIntervalId = null;
+    }
+    if (chrono.running && backdrop.hidden) {
+      bgIntervalId = setInterval(updateClockPill, 100);
+    }
+  }
+
+  function updateControls() {
+    const ms = getElapsedMs();
+    modal.classList.toggle('is-running', chrono.running);
+    modal.classList.toggle('is-paused', !chrono.running && ms > 0);
+
+    if (chrono.running) {
+      priBtn.textContent = 'Stop';
+      priBtn.classList.add('is-stop');
+      secBtn.textContent = 'Runde';
+      secBtn.disabled = false;
+    } else {
+      priBtn.textContent = ms > 0 ? 'Weiter' : 'Start';
+      priBtn.classList.remove('is-stop');
+      secBtn.textContent = 'Reset';
+      secBtn.disabled = ms === 0 && chrono.laps.length === 0;
+    }
+    updateClockPill();
+  }
+
+  function renderLaps() {
+    if (!lapsList) return;
+    if (copyBtn) copyBtn.hidden = chrono.laps.length === 0;
+    if (chrono.laps.length === 0) {
+      lapsList.innerHTML = '<div class="chrono-laps-empty">Start tippen · „Runde“ erfasst Zwischenzeiten inkl. Uhrzeit</div>';
+      if (lapHand) lapHand.setAttribute('opacity', '0');
+      return;
+    }
+
+    const splits = chrono.laps.map((l) => l.split);
+    const minSplit = chrono.laps.length >= 2 ? Math.min(...splits) : -1;
+    const maxSplit = chrono.laps.length >= 2 ? Math.max(...splits) : -1;
+
+    /* Show ghost hand at the last recorded lap's second angle */
+    const lastLap = chrono.laps[chrono.laps.length - 1];
+    if (lapHand && lastLap) {
+      const ghostDeg = ((lastLap.total % 60000) / 60000) * 360;
+      lapHand.setAttribute('transform', `rotate(${ghostDeg.toFixed(2)} 130 130)`);
+      lapHand.setAttribute('opacity', '1');
+    }
+
+    lapsList.innerHTML = chrono.laps.slice().reverse().map((l) => {
+      const cls = l.split === minSplit ? ' is-fastest' : (l.split === maxSplit ? ' is-slowest' : '');
+      return `
+        <div class="chrono-lap-row${cls}">
+          <span class="chrono-lap-num">#${l.num}</span>
+          <span class="chrono-lap-split">${formatChrono(l.split)}</span>
+          <span class="chrono-lap-total">${formatChrono(l.total)}</span>
+          <span class="chrono-lap-wall text-right">${l.wall}</span>
+        </div>`;
+    }).join('');
+  }
+
+  function renderDialFrame() {
+    const ms = getElapsedMs();
+    const lapMs = Math.max(0, ms - chrono.lastLapTotal);
+    const dig = formatChrono(ms);
+
+    if (digitalEl) {
+      digitalEl.textContent = dig;
+      digitalEl.setAttribute('font-size', dig.length > 8 ? '13.5' : '15.5');
+    }
+    const secDeg = ((ms % 60000) / 60000) * 360;
+    const minDeg = ((ms % 1800000) / 1800000) * 360;
+    if (secHand) secHand.setAttribute('transform', `rotate(${secDeg.toFixed(2)} 130 130)`);
+    if (minHand) minHand.setAttribute('transform', `rotate(${minDeg.toFixed(2)} 130 82)`);
+
+    if (curLapLabel) curLapLabel.textContent = `Runde ${chrono.laps.length + 1}`;
+    if (curLapTime) curLapTime.textContent = formatChrono(lapMs);
+
+    updateClockPill();
+
+    if (chrono.running && !backdrop.hidden) {
+      rafId = requestAnimationFrame(renderDialFrame);
+    }
+  }
+
+  function toggleRun() {
+    if (chrono.running) {
+      chrono.elapsed = getElapsedMs();
+      chrono.running = false;
+      chrono.startEpoch = 0;
+      if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    } else {
+      chrono.startEpoch = Date.now();
+      chrono.running = true;
+      if (!backdrop.hidden) rafId = requestAnimationFrame(renderDialFrame);
+    }
+    saveState();
+    updateControls();
+    renderDialFrame();
+    syncBackgroundTimer();
+  }
+
+  function lapOrReset() {
+    if (chrono.running) {
+      const total = getElapsedMs();
+      const split = Math.max(0, total - chrono.lastLapTotal);
+      chrono.lastLapTotal = total;
+      const wall = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      chrono.laps.push({ num: chrono.laps.length + 1, split, total, wall });
+      saveState();
+      renderLaps();
+      renderDialFrame();
+    } else {
+      chrono = { running: false, startEpoch: 0, elapsed: 0, lastLapTotal: 0, laps: [] };
+      saveState();
+      renderLaps();
+      updateControls();
+      renderDialFrame();
+      syncBackgroundTimer();
+    }
+  }
+
+  function openChrono() {
+    backdrop.hidden = false;
+    document.body.style.overflow = 'hidden';
+    syncBackgroundTimer();
+    updateControls();
+    renderLaps();
+    renderDialFrame();
+    if (chrono.running) rafId = requestAnimationFrame(renderDialFrame);
+  }
+
+  function closeChrono() {
+    backdrop.hidden = true;
+    document.body.style.overflow = '';
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    updateClockPill();
+    syncBackgroundTimer();
+  }
+
+  trigger.addEventListener('click', openChrono);
+  trigger.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openChrono();
+    }
+  });
+
+  closeBtn?.addEventListener('click', closeChrono);
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) closeChrono();
+  });
+
+  priBtn?.addEventListener('click', toggleRun);
+  secBtn?.addEventListener('click', lapOrReset);
+
+  copyBtn?.addEventListener('click', async () => {
+    if (!chrono.laps.length) return;
+    const lines = chrono.laps.map((l) => `Runde ${l.num}: ${formatChrono(l.split)} (Gesamt ${formatChrono(l.total)} · ${l.wall})`);
+    const text = `Chronograph Pro · Gesamt ${formatChrono(getElapsedMs())}\n` + lines.join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('Rundenprotokoll kopiert ✓');
+    } catch (e) {
+      showToast('Kopieren nicht möglich');
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (backdrop.hidden) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeChrono();
+    } else if (e.code === 'Space' && e.target.tagName !== 'BUTTON') {
+      e.preventDefault();
+      toggleRun();
+    } else if (e.key.toLowerCase() === 'l' && chrono.running) {
+      e.preventDefault();
+      lapOrReset();
+    } else if (e.key.toLowerCase() === 'r' && !chrono.running) {
+      e.preventDefault();
+      lapOrReset();
+    }
+  });
+
+  /* Initialize clock pill immediately (and resume ticker if reloaded while running) */
+  updateControls();
+  renderLaps();
+  syncBackgroundTimer();
 }

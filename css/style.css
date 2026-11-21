@@ -513,6 +513,27 @@ html[data-theme="light"] .icon-sun { display: none; }
   gap: 8px;
 }
 
+.clock-card-clickable {
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.16s ease, border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.clock-card-clickable:hover {
+  border-color: rgba(255, 42, 92, 0.36);
+  box-shadow: 0 14px 36px -12px rgba(255, 42, 92, 0.22), var(--card-shadow);
+}
+
+.clock-card-clickable:active {
+  transform: scale(0.992);
+}
+
+.clock-card-clickable:focus-visible {
+  outline: 2px solid rgba(255, 42, 92, 0.7);
+  outline-offset: 2px;
+}
+
 .clock-header {
   display: flex;
   justify-content: space-between;
@@ -577,28 +598,102 @@ html[data-theme="light"] .icon-sun { display: none; }
   font-weight: 600;
 }
 
-.clock-footer {
-  display: flex;
+.clock-chrono-pill {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.78rem;
-}
-
-.recent-label {
-  color: var(--text-muted);
-}
-
-.recent-app-pill {
-  font-weight: 600;
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--border-subtle);
-  padding: 3px 10px;
+  gap: 7px;
+  padding: 6px 13px;
   border-radius: 999px;
-  max-width: 220px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #fecdd3;
+  background: linear-gradient(135deg, rgba(255, 42, 92, 0.16), rgba(220, 38, 38, 0.09));
+  border: 1px solid rgba(255, 42, 92, 0.34);
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.16s ease;
+}
+
+.clock-card-clickable:hover .clock-chrono-pill {
+  background: linear-gradient(135deg, rgba(255, 42, 92, 0.26), rgba(220, 38, 38, 0.16));
+  border-color: rgba(255, 42, 92, 0.56);
+  box-shadow: 0 0 16px rgba(255, 42, 92, 0.22);
+}
+
+html[data-theme="light"] .clock-chrono-pill {
+  color: #be123c;
+  background: rgba(255, 42, 92, 0.09);
+  border-color: rgba(255, 42, 92, 0.28);
+}
+
+.clock-chrono-pill.is-running {
+  background: linear-gradient(135deg, rgba(255, 42, 92, 0.28), rgba(185, 28, 28, 0.22));
+  border-color: rgba(255, 42, 92, 0.72);
+  color: #fff1f2;
+  box-shadow: 0 0 18px rgba(255, 42, 92, 0.32);
+}
+
+html[data-theme="light"] .clock-chrono-pill.is-running {
+  background: #ff2a5c;
+  border-color: #e11d48;
+  color: #ffffff;
+}
+
+.clock-chrono-pill.is-paused {
+  border-color: rgba(245, 184, 46, 0.55);
+  color: #fde68a;
+  background: rgba(245, 184, 46, 0.14);
+}
+
+html[data-theme="light"] .clock-chrono-pill.is-paused {
+  color: #92400e;
+  background: rgba(245, 184, 46, 0.22);
+}
+
+.clock-chrono-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: #ff4d79;
+}
+
+.clock-chrono-pill.is-running .clock-chrono-icon,
+.clock-chrono-pill.is-paused .clock-chrono-icon {
+  display: none;
+}
+
+.clock-chrono-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff2a5c;
+  box-shadow: 0 0 8px #ff2a5c;
+  flex-shrink: 0;
+}
+
+.clock-chrono-pill.is-running .clock-chrono-dot {
+  animation: chronoPulseDot 1.1s ease-in-out infinite;
+}
+
+.clock-chrono-pill.is-paused .clock-chrono-dot {
+  background: #f5b82e;
+  box-shadow: 0 0 8px rgba(245, 184, 46, 0.7);
+  animation: none;
+}
+
+.clock-chrono-label {
+  font-family: var(--font-sans);
+  letter-spacing: 0.01em;
+}
+
+.clock-chrono-pill.is-running .clock-chrono-label,
+.clock-chrono-pill.is-paused .clock-chrono-label {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+@keyframes chronoPulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.75); }
 }
 
 /* Scratchpad Widget (Directly below Clock) */
@@ -2637,4 +2732,431 @@ html[data-theme="light"] .cmd-item:hover {
 
 .groq-btn-danger[hidden] {
   display: none;
+}
+
+/* ==========================================================================
+   Chronograph Pro · Carbon Crimson Modal
+   ========================================================================== */
+.chrono-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(5, 3, 6, 0.74);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: chronoFadeIn 0.18s ease-out;
+}
+
+.chrono-modal-backdrop[hidden] {
+  display: none;
+}
+
+@keyframes chronoFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.chrono-modal {
+  width: 100%;
+  max-width: 650px;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 24px;
+  color: #fff1f2;
+  background:
+    radial-gradient(circle at 22% 0%, rgba(255, 42, 92, 0.24), transparent 55%),
+    radial-gradient(circle at 88% 100%, rgba(220, 38, 38, 0.18), transparent 55%),
+    linear-gradient(160deg, #16090e 0%, #0d0609 55%, #12070c 100%);
+  border: 1px solid rgba(255, 42, 92, 0.36);
+  box-shadow:
+    0 28px 68px -12px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 0 42px -12px rgba(255, 42, 92, 0.28);
+  animation: chronoSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes chronoSlideUp {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.chrono-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 18px 13px;
+  border-bottom: 1px solid rgba(255, 42, 92, 0.18);
+}
+
+.chrono-title-group {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.chrono-live-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 133, 162, 0.35);
+  border: 1px solid rgba(255, 42, 92, 0.6);
+  transition: all 0.2s ease;
+}
+
+.chrono-modal.is-running .chrono-live-indicator {
+  background: #ff2a5c;
+  box-shadow: 0 0 12px #ff2a5c;
+  animation: chronoPulseDot 1.1s ease-in-out infinite;
+}
+
+.chrono-modal.is-paused .chrono-live-indicator {
+  background: #f5b82e;
+  border-color: #fde68a;
+  box-shadow: 0 0 10px rgba(245, 184, 46, 0.65);
+}
+
+.chrono-modal-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #fff1f2;
+  line-height: 1.15;
+}
+
+.chrono-modal-sub {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: #fda4af;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.chrono-close-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fecdd3;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.chrono-close-btn:hover {
+  background: rgba(255, 42, 92, 0.22);
+  border-color: rgba(255, 42, 92, 0.55);
+  color: #ffffff;
+}
+
+.chrono-body {
+  display: grid;
+  grid-template-columns: 270px 1fr;
+  gap: 18px;
+  padding: 18px 20px 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.chrono-dial-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.chrono-dial-wrap {
+  width: 244px;
+  height: 244px;
+  position: relative;
+  filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.68));
+}
+
+.chrono-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.chrono-live-lap-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(255, 42, 92, 0.1);
+  border: 1px solid rgba(255, 42, 92, 0.26);
+}
+
+.chrono-lap-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #fda4af;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.chrono-lap-time {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #fff1f2;
+}
+
+.chrono-pushers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+  max-width: 256px;
+}
+
+.chrono-btn {
+  height: 44px;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform 0.12s ease, filter 0.16s ease, background 0.16s ease, border-color 0.16s ease, opacity 0.16s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chrono-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.chrono-btn:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+}
+
+.chrono-btn-secondary {
+  background: rgba(48, 18, 27, 0.9);
+  border-color: rgba(255, 42, 92, 0.36);
+  color: #fecdd3;
+}
+
+.chrono-btn-secondary:hover:not(:disabled) {
+  background: rgba(74, 24, 39, 0.95);
+  border-color: rgba(255, 42, 92, 0.65);
+  color: #ffffff;
+}
+
+.chrono-btn-primary {
+  background: linear-gradient(135deg, #ff2a5c, #dc2626);
+  color: #ffffff;
+  box-shadow: 0 8px 22px -6px rgba(255, 42, 92, 0.65);
+}
+
+.chrono-btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+.chrono-btn-primary.is-stop {
+  background: linear-gradient(135deg, #3a0d18, #24070e);
+  border-color: rgba(255, 42, 92, 0.85);
+  color: #ff6b8f;
+  box-shadow: 0 0 20px -4px rgba(255, 42, 92, 0.45);
+}
+
+.chrono-laps-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 42, 92, 0.16);
+  border-radius: 16px;
+  padding: 12px 13px;
+}
+
+.chrono-laps-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.chrono-laps-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff1f2;
+  letter-spacing: 0.02em;
+}
+
+.chrono-copy-btn {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fecdd3;
+  background: rgba(255, 42, 92, 0.16);
+  border: 1px solid rgba(255, 42, 92, 0.34);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.chrono-copy-btn:hover {
+  background: rgba(255, 42, 92, 0.3);
+  color: #ffffff;
+}
+
+.chrono-copy-btn[hidden] {
+  display: none;
+}
+
+.chrono-laps-cols {
+  display: grid;
+  grid-template-columns: 32px 1fr 1fr 66px;
+  gap: 6px;
+  padding: 7px 6px 5px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #a67683;
+}
+
+.chrono-laps-cols .text-right,
+.chrono-lap-row .text-right {
+  text-align: right;
+}
+
+.chrono-laps-list {
+  flex: 1;
+  min-height: 120px;
+  max-height: 270px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-right: 2px;
+}
+
+.chrono-laps-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.chrono-laps-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 42, 92, 0.35);
+  border-radius: 4px;
+}
+
+.chrono-laps-empty {
+  margin: auto 0;
+  padding: 24px 8px;
+  text-align: center;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #8f6370;
+}
+
+.chrono-lap-row {
+  display: grid;
+  grid-template-columns: 32px 1fr 1fr 66px;
+  gap: 6px;
+  align-items: center;
+  padding: 7px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.77rem;
+}
+
+.chrono-lap-row.is-fastest {
+  border-color: rgba(52, 211, 153, 0.32);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.chrono-lap-row.is-slowest {
+  border-color: rgba(255, 42, 92, 0.34);
+  background: rgba(255, 42, 92, 0.09);
+}
+
+.chrono-lap-num {
+  color: #fda4af;
+  font-weight: 700;
+}
+
+.chrono-lap-split {
+  color: #fff1f2;
+  font-weight: 700;
+}
+
+.chrono-lap-row.is-fastest .chrono-lap-split {
+  color: #34d399;
+}
+
+.chrono-lap-row.is-slowest .chrono-lap-split {
+  color: #ff5c84;
+}
+
+.chrono-lap-total {
+  color: #c9a1ac;
+}
+
+.chrono-lap-wall {
+  color: #9e7481;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 640px) {
+  .chrono-modal-backdrop {
+    padding: 10px;
+    align-items: flex-end;
+  }
+
+  .chrono-modal {
+    max-width: 100%;
+    border-radius: 22px;
+    max-height: calc(100dvh - 20px);
+  }
+
+  .chrono-body {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 14px 14px calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .chrono-dial-wrap {
+    width: 220px;
+    height: 220px;
+  }
+
+  .chrono-pushers {
+    max-width: 100%;
+  }
+
+  .chrono-btn {
+    height: 46px;
+    font-size: 0.92rem;
+  }
+
+  .chrono-laps-list {
+    min-height: 76px;
+    max-height: 165px;
+  }
 }

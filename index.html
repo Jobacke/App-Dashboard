@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Board" />
-  <link rel="manifest" href="manifest.webmanifest?v=34" />
+  <link rel="manifest" href="manifest.webmanifest?v=35" />
   <link rel="icon" type="image/svg+xml" href="icons/dashboard.svg" />
   <link rel="alternate icon" type="image/png" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2" />
@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=34" />
+  <link rel="stylesheet" href="css/style.css?v=35" />
   <script>
     try {
       const savedTheme = localStorage.getItem('dashboard_theme') || 'dark';
@@ -47,7 +47,7 @@
         <div class="brand-text">
           <div class="brand-title-row">
             <span class="brand-title">Board</span>
-            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v2.1.3</span>
+            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v2.2.0</span>
           </div>
           <span class="brand-subtitle">vjbackhaus.de Ecosystem</span>
         </div>
@@ -127,10 +127,10 @@
   <main class="dashboard-main" id="dashboard-main">
     <!-- Top Section: Clock & Date (1st), Quick Memo (2nd), Checkbox Category Filter (3rd) -->
     <section class="top-widgets-section">
-      <!-- 1. Uhrzeit-Spalte ganz oben -->
-      <div class="clock-card glass-panel">
+      <!-- 1. Uhrzeit-Spalte ganz oben (Klick öffnet Chronograph Pro Stoppuhr) -->
+      <div class="clock-card glass-panel clock-card-clickable" id="clock-card-trigger" role="button" tabindex="0" title="Tippen zum Öffnen der Chronograph-Stoppuhr" aria-label="Stoppuhr öffnen">
         <div class="clock-header">
-          <span class="clock-date" id="live-date">Mittwoch, 18. Nov 2026</span>
+          <span class="clock-date" id="live-date">Samstag, 21. Nov 2026</span>
           <div class="clock-badges">
             <span class="kw-badge" id="kw-badge" title="Aktuelle Kalenderwoche">KW 47</span>
             <span class="clock-tz">MEZ</span>
@@ -141,9 +141,16 @@
             <span class="clock-time" id="live-time">08:35</span>
             <span class="clock-seconds" id="live-seconds">:00</span>
           </div>
-          <div class="clock-footer" id="recent-activity-bar">
-            <span class="recent-label">Zuletzt:</span>
-            <span class="recent-app-pill" id="last-opened-pill">Bereit zum Start</span>
+          <div class="clock-chrono-pill" id="clock-chrono-pill" aria-live="off">
+            <svg class="clock-chrono-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="13" r="8"/>
+              <path d="M12 9v4l2.5 2"/>
+              <path d="M9 2h6"/>
+              <path d="M12 2v3"/>
+              <path d="M19 6l1.5-1.5"/>
+            </svg>
+            <span class="clock-chrono-dot" id="clock-chrono-dot" hidden></span>
+            <span class="clock-chrono-label" id="clock-chrono-label">Stoppuhr</span>
           </div>
         </div>
       </div>
@@ -194,9 +201,9 @@
 
     <!-- App Footer with Version & Build Info -->
     <footer class="dashboard-footer">
-      <span>Board · <strong id="footer-version">v2.1.3</strong></span>
+      <span>Board · <strong id="footer-version">v2.2.0</strong></span>
       <span>·</span>
-      <span id="footer-date">Stand 20.11.2026</span>
+      <span id="footer-date">Stand 21.11.2026</span>
       <span>·</span>
       <button type="button" class="footer-check-btn" id="footer-update-check">Auf Update prüfen</button>
     </footer>
@@ -296,9 +303,122 @@
     </div>
   </div>
 
+  <!-- Chronograph Pro · Carbon Crimson Stopwatch Modal -->
+  <div class="chrono-modal-backdrop" id="chrono-modal-backdrop" hidden>
+    <div class="chrono-modal" id="chrono-modal" role="dialog" aria-modal="true" aria-labelledby="chrono-modal-title">
+      <div class="chrono-modal-header">
+        <div class="chrono-title-group">
+          <span class="chrono-live-indicator" id="chrono-live-indicator"></span>
+          <div>
+            <h3 id="chrono-modal-title" class="chrono-modal-title">Chronograph Pro</h3>
+            <span class="chrono-modal-sub">Carbon Crimson · 1/100 s</span>
+          </div>
+        </div>
+        <button type="button" class="chrono-close-btn" id="chrono-close-btn" title="Schließen (Stoppuhr läuft weiter)" aria-label="Schließen">✕</button>
+      </div>
+
+      <div class="chrono-body">
+        <!-- Analog + Digital Dial -->
+        <div class="chrono-dial-column">
+          <div class="chrono-dial-wrap">
+            <svg id="chrono-svg" class="chrono-svg" viewBox="0 0 260 260" aria-hidden="true">
+              <defs>
+                <radialGradient id="chronoDialBg" cx="50%" cy="34%" r="68%">
+                  <stop offset="0%" stop-color="#35131e" />
+                  <stop offset="56%" stop-color="#17090e" />
+                  <stop offset="100%" stop-color="#080305" />
+                </radialGradient>
+                <linearGradient id="chronoBezelGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#ff2a5c" />
+                  <stop offset="48%" stop-color="#dc2626" />
+                  <stop offset="100%" stop-color="#fb7185" />
+                </linearGradient>
+                <radialGradient id="chronoSubdialBg" cx="50%" cy="40%" r="65%">
+                  <stop offset="0%" stop-color="#1d0b11" />
+                  <stop offset="100%" stop-color="#090306" />
+                </radialGradient>
+                <filter id="chronoCrimsonGlow" x="-25%" y="-25%" width="150%" height="150%">
+                  <feGaussianBlur stdDeviation="2.4" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+
+              <!-- Outer Brushed Carbon Bezel & Crimson Ring -->
+              <circle cx="130" cy="130" r="124" fill="#0d0609" stroke="rgba(255,255,255,0.08)" stroke-width="1.5" />
+              <circle cx="130" cy="130" r="118" fill="url(#chronoDialBg)" stroke="url(#chronoBezelGrad)" stroke-width="3.6" />
+              <circle cx="130" cy="130" r="108" fill="none" stroke="rgba(255,42,92,0.28)" stroke-width="1" />
+              <circle cx="130" cy="130" r="76" fill="none" stroke="rgba(255,255,255,0.045)" stroke-width="1" />
+
+              <!-- Precision 60-sec & 1/5-sec ticks (generated in JS) -->
+              <g id="chrono-ticks"></g>
+
+              <!-- 30-Minute Totalizer Subdial (12 o'clock) -->
+              <circle cx="130" cy="82" r="27" fill="url(#chronoSubdialBg)" stroke="rgba(255,42,92,0.52)" stroke-width="1.25" />
+              <g id="chrono-subticks"></g>
+              <text x="130" y="65" text-anchor="middle" fill="#fda4af" font-size="8" font-weight="700" font-family="JetBrains Mono, ui-monospace, monospace">30</text>
+              <text x="149" y="85" text-anchor="middle" fill="#fda4af" font-size="8" font-weight="700" font-family="JetBrains Mono, ui-monospace, monospace">10</text>
+              <text x="111" y="85" text-anchor="middle" fill="#fda4af" font-size="8" font-weight="700" font-family="JetBrains Mono, ui-monospace, monospace">20</text>
+              <line id="chrono-min-hand" x1="130" y1="82" x2="130" y2="60" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" />
+              <circle cx="130" cy="82" r="3" fill="#ff2a5c" stroke="#ffffff" stroke-width="0.9" />
+
+              <!-- Recessed Digital Readout Window (6 o'clock) -->
+              <rect x="74" y="158" width="112" height="29" rx="8" fill="#090306" stroke="rgba(255,42,92,0.55)" stroke-width="1.25" />
+              <text id="chrono-digital" x="130" y="177.5" text-anchor="middle" fill="#fff1f2" font-size="15.5" font-weight="700" font-family="JetBrains Mono, ui-monospace, monospace">00:00.00</text>
+
+              <!-- Previous Lap Ghost Hand (visible once >= 1 lap recorded) -->
+              <g id="chrono-lap-hand" opacity="0">
+                <line x1="130" y1="130" x2="130" y2="30" stroke="rgba(255, 241, 242, 0.32)" stroke-width="1.6" stroke-dasharray="3 3" stroke-linecap="round" />
+              </g>
+
+              <!-- Primary Dual-Tone Crimson & White Sweep Second Hand -->
+              <g id="chrono-sec-hand" filter="url(#chronoCrimsonGlow)">
+                <line x1="130" y1="154" x2="130" y2="24" stroke="#ff2a5c" stroke-width="2.8" stroke-linecap="round" />
+                <line x1="130" y1="47" x2="130" y2="24" stroke="#ffffff" stroke-width="2.8" stroke-linecap="round" />
+                <circle cx="130" cy="150" r="2.8" fill="#ff2a5c" />
+                <circle cx="130" cy="130" r="6" fill="#ff2a5c" stroke="#ffffff" stroke-width="1.8" />
+                <circle cx="130" cy="130" r="2" fill="#090306" />
+              </g>
+            </svg>
+          </div>
+
+          <div class="chrono-live-lap-bar">
+            <span class="chrono-lap-badge" id="chrono-current-lap-label">Runde 1</span>
+            <span class="chrono-lap-time" id="chrono-current-lap-time">00:00.00</span>
+          </div>
+
+          <!-- Ergonomic Pushers -->
+          <div class="chrono-pushers">
+            <button type="button" class="chrono-btn chrono-btn-secondary" id="chrono-sec-btn" disabled>Reset</button>
+            <button type="button" class="chrono-btn chrono-btn-primary" id="chrono-pri-btn">Start</button>
+          </div>
+        </div>
+
+        <!-- Lap Protocol Column -->
+        <div class="chrono-laps-column">
+          <div class="chrono-laps-header">
+            <span class="chrono-laps-title">Rundenprotokoll</span>
+            <button type="button" class="chrono-copy-btn" id="chrono-copy-btn" hidden title="Rundenzeiten kopieren">Kopieren</button>
+          </div>
+          <div class="chrono-laps-cols">
+            <span>#</span>
+            <span>Runde</span>
+            <span>Gesamt</span>
+            <span class="text-right">Uhrzeit</span>
+          </div>
+          <div class="chrono-laps-list" id="chrono-laps-list">
+            <div class="chrono-laps-empty">Start tippen · „Runde“ erfasst Zwischenzeiten inkl. Uhrzeit</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
-  <script src="js/app.js?v=34"></script>
+  <script src="js/app.js?v=35"></script>
 </body>
 </html>
