@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Board" />
-  <link rel="manifest" href="manifest.webmanifest?v=36" />
+  <link rel="manifest" href="manifest.webmanifest?v=37" />
   <link rel="icon" type="image/svg+xml" href="icons/dashboard.svg" />
   <link rel="alternate icon" type="image/png" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2" />
@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=36" />
+  <link rel="stylesheet" href="css/style.css?v=37" />
   <script>
     try {
       const savedTheme = localStorage.getItem('dashboard_theme') || 'dark';
@@ -47,7 +47,7 @@
         <div class="brand-text">
           <div class="brand-title-row">
             <span class="brand-title">Board</span>
-            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v2.2.1</span>
+            <span class="version-badge" id="app-version-badge" title="Installierte Board-Version (Tippen zum Prüfen auf Updates)">v2.2.2</span>
           </div>
           <span class="brand-subtitle">vjbackhaus.de Ecosystem</span>
         </div>
@@ -131,26 +131,28 @@
       <div class="clock-card glass-panel clock-card-clickable" id="clock-card-trigger" role="button" tabindex="0" title="Tippen zum Öffnen der Chronograph-Stoppuhr" aria-label="Stoppuhr öffnen">
         <div class="clock-header">
           <span class="clock-date" id="live-date">Samstag, 21. Nov 2026</span>
-          <div class="clock-badges">
+        </div>
+        <div class="clock-main-row">
+          <div class="clock-side-meta">
             <span class="kw-badge" id="kw-badge" title="Aktuelle Kalenderwoche">KW 47</span>
             <span class="clock-tz">MEZ</span>
           </div>
-        </div>
-        <div class="clock-main-row">
           <div class="clock-time-wrap">
             <span class="clock-time" id="live-time">08:35</span>
             <span class="clock-seconds" id="live-seconds">:00</span>
           </div>
-          <div class="clock-chrono-pill" id="clock-chrono-pill" aria-live="off">
-            <svg class="clock-chrono-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="13" r="8"/>
-              <path d="M12 9v4l2.5 2"/>
-              <path d="M9 2h6"/>
-              <path d="M12 2v3"/>
-              <path d="M19 6l1.5-1.5"/>
-            </svg>
-            <span class="clock-chrono-dot" id="clock-chrono-dot" hidden></span>
-            <span class="clock-chrono-label" id="clock-chrono-label">Stoppuhr</span>
+          <div class="clock-side-action">
+            <div class="clock-chrono-pill" id="clock-chrono-pill" aria-live="off">
+              <svg class="clock-chrono-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="13" r="8"/>
+                <path d="M12 9v4l2.5 2"/>
+                <path d="M9 2h6"/>
+                <path d="M12 2v3"/>
+                <path d="M19 6l1.5-1.5"/>
+              </svg>
+              <span class="clock-chrono-dot" id="clock-chrono-dot" hidden></span>
+              <span class="clock-chrono-label" id="clock-chrono-label">Stoppuhr</span>
+            </div>
           </div>
         </div>
       </div>
@@ -201,7 +203,7 @@
 
     <!-- App Footer with Version & Build Info -->
     <footer class="dashboard-footer">
-      <span>Board · <strong id="footer-version">v2.2.1</strong></span>
+      <span>Board · <strong id="footer-version">v2.2.2</strong></span>
       <span>·</span>
       <span id="footer-date">Stand 21.11.2026</span>
       <span>·</span>
@@ -417,6 +419,6 @@
   <!-- Toast Notification -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
-  <script src="js/app.js?v=36"></script>
+  <script src="js/app.js?v=37"></script>
 </body>
 </html>
