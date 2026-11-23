@@ -1,5 +1,5 @@
 {
-  "version": "2.2.4",
-  "date": "2026-11-21",
-  "notes": "Board-Tresor speichert auch die ZNA-Navi Kategoriefilter & Navi-Auswahl dauerhaft über Neustarts hinweg"
+  "version": "2.2.5",
+  "date": "2026-11-23",
+  "notes": "App-Fenster: Board dahinter scrollt nicht mehr mit – keine Laufleiste am rechten Rand"
 }

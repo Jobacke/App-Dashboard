@@ -1874,6 +1874,14 @@ html[data-theme="light"] .quick-chip {
   visibility: hidden;
   pointer-events: none;
   transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), width 0.3s ease, visibility 0.35s;
+  overscroll-behavior: contain;
+}
+
+/* App-Fenster offen: Board-Seite dahinter scrollt nicht mit (keine Laufleiste am rechten Rand) */
+html.cockpit-offen,
+html.cockpit-offen body {
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .cockpit-drawer.open {

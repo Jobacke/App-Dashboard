@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '2.2.4';
+const APP_VERSION = '2.2.5';
 const APP_BUILD_DATE = '21.11.2026';
 
 const APPS = [
@@ -913,6 +913,8 @@ function openCockpit(appId, customUrl = null) {
     drawer.classList.add('open');
     drawer.setAttribute('aria-hidden', 'false');
   }
+  // Board dahinter festhalten – sonst scrollt beim Wischen im App-Fenster die Board-Seite mit (Laufleiste rechts)
+  document.documentElement.classList.add('cockpit-offen');
   if (backdrop) backdrop.hidden = false;
   hideCockpitShareBar();
   renderDock();
@@ -929,6 +931,7 @@ function closeCockpit() {
     drawer.classList.remove('open');
     drawer.setAttribute('aria-hidden', 'true');
   }
+  document.documentElement.classList.remove('cockpit-offen');
   if (backdrop) backdrop.hidden = true;
   if (iframe) iframe.src = 'about:blank';
   renderDock();
