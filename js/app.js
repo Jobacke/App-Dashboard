@@ -2,7 +2,7 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '2.2.6';
+const APP_VERSION = '2.3.0';
 const APP_BUILD_DATE = '24.11.2026';
 
 const APPS = [
@@ -2025,8 +2025,8 @@ function initVersionDisplayAndUpdateCheck() {
   const footerBtn = document.getElementById('footer-update-check');
   const updateBanner = document.getElementById('update-banner');
 
-  if (headerBadge) headerBadge.textContent = `v${APP_VERSION}`;
-  if (footerVer) footerVer.textContent = `v${APP_VERSION}`;
+  if (headerBadge) headerBadge.textContent = `Version ${APP_VERSION}`;
+  if (footerVer) footerVer.textContent = `Version ${APP_VERSION}`;
   if (footerDate) footerDate.textContent = `Stand ${APP_BUILD_DATE}`;
 
   async function checkRemoteVersion(manual = false) {
@@ -2036,13 +2036,13 @@ function initVersionDisplayAndUpdateCheck() {
       const data = await res.json();
       if (data.version && isVersionNewer(data.version, APP_VERSION)) {
         showUpdateAvailableBanner(data.version, data.notes || '');
-        if (manual) showToast(`Neue Version v${data.version} verfügbar!`);
+        if (manual) showToast(`Neue Version ${data.version} verfügbar!`);
       } else {
         if (updateBanner) updateBanner.hidden = true;
-        if (manual) showToast(`Board v${APP_VERSION} ist auf dem neuesten Stand ✓`);
+        if (manual) showToast(`Board Version ${APP_VERSION} ist auf dem neuesten Stand ✓`);
       }
     } catch (e) {
-      if (manual) showToast(`Installierte Version: v${APP_VERSION}`);
+      if (manual) showToast(`Installierte Version: ${APP_VERSION}`);
     }
   }
 
