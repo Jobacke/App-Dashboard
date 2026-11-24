@@ -2,8 +2,8 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '2.2.5';
-const APP_BUILD_DATE = '21.11.2026';
+const APP_VERSION = '2.2.6';
+const APP_BUILD_DATE = '24.11.2026';
 
 const APPS = [
   {
@@ -22,8 +22,8 @@ const APPS = [
     description: 'Persönliches Schichttagebuch für den Rettungsdienst mit CareMan-Sync, Dienstplan-Statistiken, Einsatzdokumentation und Kalender-Export.',
     telemetry: 'CareMan Autopilot & Cloud-Sync aktiv',
     quickActions: [
-      { label: '📅 Dienstplan & Schichten', url: 'https://schicht.vjbackhaus.de/' },
-      { label: '⚡ CareMan Sync', url: 'https://schicht.vjbackhaus.de/' }
+      { label: '📅 Dienstplan', url: 'https://schicht.vjbackhaus.de/journal' },
+      { label: '⚡ CareMan Sync', url: 'https://schicht.vjbackhaus.de/?abruf=1' }
     ],
     keywords: 'schichtbuch dienstplan rettungsdienst arbeit schichten careman kalender urlaub überstunden'
   },
@@ -45,8 +45,8 @@ const APPS = [
     description: 'Persönliche Wissensdatenbank für den Rettungsdienst – strukturierte Algorithmen, Medikamente & Leitlinien, per Siri und Claude abrufbar.',
     telemetry: 'Siri-Kurzbefehle & KI-Assistent integriert',
     quickActions: [
-      { label: '📖 Alle Themen', url: 'https://wissen.vjbackhaus.de/#/' },
-      { label: '⚙️ Einstellungen', url: 'https://wissen.vjbackhaus.de/#/einstellungen' }
+      { label: '💊 Medikamente', url: 'https://wissen.vjbackhaus.de/#/b/medikament' },
+      { label: '📋 Algorithmen', url: 'https://wissen.vjbackhaus.de/#/b/algorithmus' }
     ],
     keywords: 'wissen rd rettungsdienst medikamente algorithmen siri nachschlagewerk notfallmedizin leitlinien'
   },
@@ -66,8 +66,7 @@ const APPS = [
     description: 'Ein Tipp – Waze oder Karten navigiert sofort zur richtigen Notaufnahme und Liegendanfahrt inklusive Leitstellen-Index.',
     telemetry: 'Direkt-Routing zu ZNAs & Leitstellen',
     quickActions: [
-      { label: '🚑 ZNA-Auswahl starten', url: 'https://zna.vjbackhaus.de/' },
-      { label: '📍 Leitstellen-Index', url: 'https://zna.vjbackhaus.de/' }
+      { label: '📍 Leitstellen', url: 'https://zna.vjbackhaus.de/?ansicht=leitstellen' }
     ],
     keywords: 'zna navi notaufnahme klinik krankenhaus waze navigation rettungsdienst anfahrt leitstelle'
   },
@@ -87,8 +86,7 @@ const APPS = [
     description: 'Sprachnotizen und Gedanken blitzschnell aufnehmen, transkribieren und übersichtlich organisieren.',
     telemetry: 'Audio-Aufnahme & Cloud-Organisation',
     quickActions: [
-      { label: '🎙️ Neue Sprachnotiz', url: 'https://remembers.vjbackhaus.de/' },
-      { label: '🗂️ Alle Aufnahmen', url: 'https://remembers.vjbackhaus.de/' }
+      { label: '🎙️ Neue Sprachnotiz', url: 'https://remembers.vjbackhaus.de/?aktion=aufnahme' }
     ],
     keywords: 'notizen sprachnotizen remembers audio memo diktiergerät ideen aufnahme'
   },
@@ -108,8 +106,8 @@ const APPS = [
     description: 'Gesundheitscockpit für tägliche Gesundheitswerte, Schlafdaten, HRV, Konstanz und langfristige Verlaufsanalyse.',
     telemetry: 'Apple Health & Kurzbefehl-Sync bereit',
     quickActions: [
-      { label: '❤️ Tageswerte & Trend', url: 'https://cockpit.vjbackhaus.de/' },
-      { label: '😴 Schlaf & Konstanz', url: 'https://cockpit.vjbackhaus.de/' }
+      { label: '📈 Verlauf', url: 'https://cockpit.vjbackhaus.de/?tab=verlauf' },
+      { label: '📅 Konstanz', url: 'https://cockpit.vjbackhaus.de/?tab=konstanz' }
     ],
     keywords: 'gesundheit gesundheitscockpit schlaf puls hrv gewicht blutdruck vitalwerte konstanz'
   },
@@ -129,8 +127,7 @@ const APPS = [
     description: 'Smarte Trainingsanalyse, KI-Coaching, Zwift Custom-Workouts und integrierte Wahoo KICKR Headwind Vollbild-Steuerung.',
     telemetry: 'Strava Sync · Zwift Workouts · Headwind BLE',
     quickActions: [
-      { label: '📊 Trainings-Dashboard', url: 'https://analytics.vjbackhaus.de/' },
-      { label: '🌬️ KICKR Headwind Cockpit', url: 'https://analytics.vjbackhaus.de/?headwind=1' }
+      { label: '🌬️ KICKR Headwind', url: 'https://analytics.vjbackhaus.de/?headwind=1' }
     ],
     keywords: 'analytics strava zwift radfahren training watt ftp kickr headwind coaching workout'
   },
@@ -150,8 +147,8 @@ const APPS = [
     description: 'Digitales Motorrad-Logbuch für Touren, Wartungsintervalle, Tankstopps, Reifenverschleiß und Fahrzeug-Telemetrie.',
     telemetry: 'Touren-, Tank- & Wartungs-Historie',
     quickActions: [
-      { label: '🏍️ Touren & Logbuch', url: 'https://tagebuch.vjbackhaus.de/' },
-      { label: '🔧 Wartung & Service', url: 'https://tagebuch.vjbackhaus.de/' }
+      { label: '⛽ KM & Tanken', url: 'https://tagebuch.vjbackhaus.de/?quick=1' },
+      { label: '🔧 Service', url: 'https://tagebuch.vjbackhaus.de/service' }
     ],
     keywords: 'mopped moppedtagebuch motorrad touren tanken wartung kilometerstand bike'
   }

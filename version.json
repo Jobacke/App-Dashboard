@@ -1,5 +1,5 @@
 {
-  "version": "2.2.5",
-  "date": "2026-11-23",
-  "notes": "App-Fenster: Board dahinter scrollt nicht mehr mit – keine Laufleiste am rechten Rand"
+  "version": "2.2.6",
+  "date": "2026-11-24",
+  "notes": "Schnellknöpfe starten direkt die passende Funktion (CareMan-Abruf, Sprachnotiz, Leitstellen, Tanken …); doppelte Start-Knöpfe entfernt"
 }
