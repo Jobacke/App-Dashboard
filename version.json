@@ -1,5 +1,5 @@
 {
-  "version": "2.3.0",
-  "date": "2026-11-24",
-  "notes": "Einheitliche Versionsanzeige (Version 2.3.0)"
+  "version": "2.3.1",
+  "date": "2026-11-28",
+  "notes": "Nachrichten nur noch von eigenen Apps annehmen (Speicher & Weiterleitung abgesichert)"
 }

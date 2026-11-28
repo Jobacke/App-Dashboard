@@ -2,8 +2,8 @@
    Board · App-Dashboard — Application Logic & Interactive Features
    ========================================================================== */
 
-const APP_VERSION = '2.3.0';
-const APP_BUILD_DATE = '24.11.2026';
+const APP_VERSION = '2.3.1';
+const APP_BUILD_DATE = '28.11.2026';
 
 const APPS = [
   {
@@ -888,7 +888,7 @@ function openCockpit(appId, customUrl = null) {
         (p) => {
           pendingGeoCoords = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() };
           try {
-            iframe.contentWindow?.postMessage({ type: 'board-geolocation-result', ok: true, coords: pendingGeoCoords }, '*');
+            iframe.contentWindow?.postMessage({ type: 'board-geolocation-result', ok: true, coords: pendingGeoCoords }, new URL(finalUrl).origin);
           } catch {}
         },
         () => {},
@@ -899,7 +899,7 @@ function openCockpit(appId, customUrl = null) {
       if (loader) loader.hidden = true;
       if (pendingGeoCoords) {
         try {
-          iframe.contentWindow?.postMessage({ type: 'board-geolocation-result', ok: true, coords: pendingGeoCoords }, '*');
+          iframe.contentWindow?.postMessage({ type: 'board-geolocation-result', ok: true, coords: pendingGeoCoords }, new URL(finalUrl).origin);
         } catch {}
       }
     };
@@ -1088,7 +1088,11 @@ function initCockpitControls() {
   });
 
   /* Listen for navigation / close / persistent auth-storage requests sent from embedded apps */
+  // Nur Nachrichten der eigenen, im Board eingebetteten Apps annehmen (z. B. https://schicht.vjbackhaus.de).
+  // Fremde Seiten dürfen weder den Speicher auslesen noch das Board umleiten.
+  const TRUSTED_APP_ORIGINS = new Set(APPS.map(a => { try { return new URL(a.url).origin; } catch { return ''; } }).filter(Boolean));
   window.addEventListener('message', (e) => {
+    if (!TRUSTED_APP_ORIGINS.has(e.origin)) return;
     if (!e.data || typeof e.data !== 'object') return;
     if (e.data.type === 'zna-open-url' && e.data.url) {
       window.location.href = e.data.url;
@@ -1106,14 +1110,14 @@ function initCockpitControls() {
       try {
         const val = localStorage.getItem('board_vault_' + e.data.key);
         if (val && e.source && typeof e.source.postMessage === 'function') {
-          e.source.postMessage({ type: 'board-storage-value', key: e.data.key, value: val }, '*');
+          e.source.postMessage({ type: 'board-storage-value', key: e.data.key, value: val }, e.origin);
         }
       } catch {}
     } else if (e.data.type === 'board-get-geolocation') {
       const reqId = e.data.reqId || '';
       const targetWin = e.source || document.getElementById('cockpit-iframe')?.contentWindow;
       if (!navigator.geolocation) {
-        try { targetWin?.postMessage({ type: 'board-geolocation-result', reqId, ok: false, code: 2 }, '*'); } catch {}
+        try { targetWin?.postMessage({ type: 'board-geolocation-result', reqId, ok: false, code: 2 }, e.origin); } catch {}
         return;
       }
       navigator.geolocation.getCurrentPosition(
@@ -1124,7 +1128,7 @@ function initCockpitControls() {
               reqId,
               ok: true,
               coords: { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() }
-            }, '*');
+            }, e.origin);
           } catch {}
         },
         (err) => {
@@ -1134,7 +1138,7 @@ function initCockpitControls() {
               reqId,
               ok: false,
               code: err ? err.code : 1
-            }, '*');
+            }, e.origin);
           } catch {}
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
